@@ -13,6 +13,7 @@
 #include <netdb.h>
 #include <errno.h>
 #include <arpa/inet.h>
+#include <time.h>
 
 #define porta_servidor  7325
 
@@ -21,8 +22,8 @@ int main(int argc, char *argv[])
     time_t seed;
     int operacao;
 
-    char buffer_envio[50];              
-    char buffer_recebimento[50]; 
+    char *buffer_envio[80];              
+    char *buffer_recebimento[80]; 
 
     struct hostent *hostnm;    
     struct sockaddr_in server; 
@@ -73,7 +74,7 @@ int main(int argc, char *argv[])
         perror("Connect()");
         exit(4);
     }
-   
+
     sprintf(buffer_envio,"%d",telefone);
     send(socket_envia, buffer_envio, strlen(buffer_envio)+1, 0);
     if (socket_envia < 0)
@@ -82,7 +83,7 @@ int main(int argc, char *argv[])
         exit(5);
     }
 
-    srand((unsigned) time(&seed));   ///////////////////????????????????????????????????
+    srand((unsigned) time(&seed)); 
     porta_recebimento = rand()%65500;
 
     sprintf(buffer_envio,"%d",porta_recebimento);
