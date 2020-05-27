@@ -110,49 +110,6 @@ int main(int argc, char *argv[])
     }
 }
 
-void thread_cliente(thread_args *argumentos)
-{
-    int socket_redirecionado = argumentos->socket_redirecionado;
-    char *cliente_endereco = argumentos->cliente_endereco;
-
-    char buffer_envia[50];
-    char buffer_recebe[50];
-
-    int telefone_cliente, porta_envio_cliente;
-
-    if (recv(socket_redirecionado, buffer_recebe, sizeof(buffer_recebe), 0) == -1)
-    {
-        perror("ERRO - Listen()");
-        exit(errno);
-    }
-    system("clear");
-    printf("Servidor WhatsAp2p iniciado.\n\n");
-
-    do{
-
-        namelen = sizeof(cliente);
-        if ((socket_thread = accept(socket_conexao, (struct sockaddr *)&cliente, (socklen_t *)&namelen)) == -1)
-        {
-            perror("ERRO - Accept()");
-            exit(errno);
-        }
-        t_arg.socket = socket_thread;
-        t_arg.lista = lista;
-        t_arg.myName = cliente;
-
-        thread_create_result = pthread_create(&ptid,NULL,&thread_cliente,&t_arg);
-        if(thread_create_result != 0){
-            perror("ERRO - thread_create()");
-            exit(thread_create_result);
-        }
-
-    }while(1);
-    close(socket_conexao);
-    pthread_mutex_destroy(&mutex);
-    printf("Servidor encerrado\n");
-    return EXIT_SUCCESS;
-}
-
 void *thread_cliente(void *arg)
 {
     char *buffer_envia[80];              
