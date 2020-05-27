@@ -17,7 +17,7 @@
 //comandos
 #define ENCERRAR "encerrar" // encerra conexao, o que torna offline
 #define GET "get" // requere informacao do servidor, necessario informar telefone
-
+#define REMOVE "remove" //pede a remocao dos dados do servidor, ocasiona na sua desconexao
 
 typedef struct no{
     char *telefone;
@@ -106,14 +106,46 @@ int main(int argc, char *argv[])
     if (socket_conexao < 0)
     {
        perror("ERRO - Bind()");
+       printf("%i",errno);
        exit(errno);
     }
+    
+    if (listen(socket_conexao, 1) != 0)
+    {
+        perror("ERRO - Listen()");
+        exit(errno);
+    }
+    system("clear");
+    printf("Servidor WhatsAp2p iniciado na porta %i\n\n",ntohs(servidor.sin_port));
+
+    do{
+        namelen = sizeof(cliente);
+        if ((socket_thread = accept(socket_conexao, (struct sockaddr *)&cliente, (socklen_t *)&namelen)) == -1)
+        {
+            perror("ERRO - Accept()");
+            exit(errno);
+        }
+        t_arg.socket = socket_thread;
+        t_arg.lista = lista;
+        t_arg.myName = cliente;
+
+        thread_create_result = pthread_create(&ptid,NULL,&thread_cliente,&t_arg);
+        if(thread_create_result != 0){
+            perror("ERRO - thread_create()");
+            exit(thread_create_result);
+        }
+
+    }while(1);
+    close(socket_conexao);
+    pthread_mutex_destroy(&mutex);
+    printf("Servidor encerrado\n");
+    return EXIT_SUCCESS;
 }
 
 void *thread_cliente(void *arg)
 {
-    char *buffer_envia[80];              
-    char *buffer_recebe[80];
+    char buffer_envia[80];              
+    char buffer_recebe[80];
     char *msg[80];
     usuario cliente;
 
@@ -152,6 +184,11 @@ void *thread_cliente(void *arg)
             //Requisicao de informações
 
         }
+        if(strcmp(msg[0],REMOVE) == 0){
+            //Requisicao de remocao
+            
+        }
+        
 
     }while(strcmp(msg[0],ENCERRAR) != 0);
 
