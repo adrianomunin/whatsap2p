@@ -17,7 +17,7 @@
 //comandos
 #define ENCERRAR "encerrar" // encerra conexao, o que torna offline
 #define GET "get" // requere informacao do servidor, necessario informar telefone
-
+#define REMOVE "remove" //pede a remocao dos dados do servidor, ocasiona na sua desconexao
 
 typedef struct no{
     char *telefone;
@@ -152,6 +152,11 @@ void *thread_cliente(void *arg)
             //Requisicao de informações
 
         }
+        if(strcmp(msg[0],REMOVE) == 0){
+            //Requisicao de remocao
+            
+        }
+        
 
     }while(strcmp(msg[0],ENCERRAR) != 0);
 
