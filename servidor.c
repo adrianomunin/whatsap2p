@@ -10,7 +10,7 @@
 #include <errno.h>
 #include <arpa/inet.h>
 #include <time.h>
-#include <pthread.h> 
+#include <pthread.h>
 
 #define porta_servidor 7325
 
@@ -18,7 +18,7 @@ struct cliente
 {
     int telefone;
     int porta;
-    char *endereco;
+    struct sockaddr_in cliente_endereco;
     struct cliente *prox;
 
 } typedef cliente;
@@ -26,14 +26,14 @@ struct cliente
 struct
 {
     int socket_redirecionado;
-    char *cliente_endereco;
+    struct sockaddr_in cliente_endereco;
 
 } typedef thread_args, *ptr_thread_arg;
 
 cliente *lista_clientes;
 
 void *thread_cliente(void *argumentos);
-int registrar_cliente(int telefone, int porta, char *endereco);
+int registrar_cliente(int telefone, int porta, struct sockaddr_in endereco);
 int excluir_cliente(int telefone);
 cliente procurar_cliente(int telefone);
 
@@ -44,7 +44,7 @@ int main(int argc, char *argv[])
     int socket_conexao;
     int socket_redirecionado;
 
-    char *cliente_endereco;
+    struct sockaddr_in cliente_endereco;
 
     struct sockaddr_in cliente;
     struct sockaddr_in servidor;
@@ -53,10 +53,10 @@ int main(int argc, char *argv[])
     thread_args argumentos;
 
     if ((socket_conexao = socket(PF_INET, SOCK_STREAM, 0)) < 0)
-        {
-            perror("Socket()");
-            exit(2);
-        }
+    {
+        perror("Socket()");
+        exit(2);
+    }
 
     servidor.sin_family = AF_INET;
     servidor.sin_port = htons(porta_servidor);
@@ -84,24 +84,22 @@ int main(int argc, char *argv[])
             exit(5);
         }
 
-        cliente_endereco = inet_ntoa(cliente.sin_addr);
+        cliente_endereco.sin_addr = cliente.sin_addr;
 
-    
-       // argumentos.cliente_endereco = cliente_endereco;
+        argumentos.cliente_endereco = cliente_endereco;
         argumentos.socket_redirecionado = socket_redirecionado;
-        pthread_create(&thread_id, NULL, &thread_cliente, &argumentos); 
-        
-        
-    }while (1);
+        pthread_create(&thread_id, NULL, &thread_cliente, &argumentos);
+
+    } while (1);
     close(socket_conexao);
     return EXIT_SUCCESS;
 }
 
-void * thread_cliente(void *arg)
+void *thread_cliente(void *arg)
 {
     ptr_thread_arg argumentos = (ptr_thread_arg)arg;
     int socket_redirecionado = argumentos->socket_redirecionado;
-    //char *cliente_endereco = argumentos->cliente_endereco;
+    struct sockaddr_in cliente_endereco = argumentos->cliente_endereco;
 
     char buffer_envia[50];
     char buffer_recebe[50];
@@ -110,30 +108,30 @@ void * thread_cliente(void *arg)
 
     if (recv(socket_redirecionado, buffer_recebe, sizeof(buffer_recebe), 0) == -1)
     {
-        fprintf(stderr,"ERRO - Recv(ctS): %s\n",strerror(errno));
+        fprintf(stderr, "ERRO - Recv(ctS): %s\n", strerror(errno));
         exit(-1);
     }
     telefone_cliente = atoi(buffer_recebe);
 
     if (recv(socket_redirecionado, buffer_recebe, sizeof(buffer_recebe), 0) == -1)
     {
-        fprintf(stderr,"ERRO - Recv(ctS): %s\n",strerror(errno));
+        fprintf(stderr, "ERRO - Recv(ctS): %s\n", strerror(errno));
         exit(-1);
     }
     porta_envio_cliente = atoi(buffer_recebe);
 
     printf("Telefone: %d \n", telefone_cliente);
     printf("Porta: %d\n", porta_envio_cliente);
-    //printf("Endereco: %s \n", cliente_endereco);
+    printf("Endereco: %s \n", inet_ntoa(cliente_endereco.sin_addr));
 
     //registrar_cliente(telefone_cliente, porta_envio_cliente, cliente_endereco);
 
     close(socket_redirecionado);
-    
+
     pthread_exit(NULL);
 }
 
-int registrar_cliente(int telefone, int porta, char *endereco)
+int registrar_cliente(int telefone, int porta, struct sockaddr_in endereco)
 {
     cliente *pont_auxiliar = lista_clientes;
 
@@ -146,7 +144,7 @@ int registrar_cliente(int telefone, int porta, char *endereco)
             return 1; //Codigo para erro
         }
 
-        lista_clientes->endereco = endereco;
+        lista_clientes->cliente_endereco = endereco;
         lista_clientes->porta = porta;
         lista_clientes->telefone = telefone;
     }
@@ -164,7 +162,7 @@ int registrar_cliente(int telefone, int porta, char *endereco)
             return 1; //Codigo para erro
         }
 
-        pont_auxiliar->endereco = endereco;
+        pont_auxiliar->cliente_endereco = endereco;
         pont_auxiliar->porta = porta;
         pont_auxiliar->telefone = telefone;
     }

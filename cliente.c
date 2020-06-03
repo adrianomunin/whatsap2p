@@ -28,10 +28,11 @@ int main(int argc, char *argv[])
     struct sockaddr_in server;
 
     int socket_recebe, socket_envia;
-    int ip_recebimento, porta_recebimento, telefone;
+    int ip_recebimento, porta_recebimento;
+    char telefone[50];
 
     printf("Informe seu telefone: ");
-    scanf("%i", &telefone);
+    fgets(telefone, 50, stdin);
 
     if (argc == 3)
     {
@@ -74,19 +75,20 @@ int main(int argc, char *argv[])
         exit(4);
     }
 
-    sprintf(buffer_envio, "%d", telefone);
-    if (send(socket_envia, buffer_envio, sizeof(buffer_envio), 0) < 0)
+    //sprintf(buffer_envio, "%i", telefone);
+    if (send(socket_envia, telefone, sizeof(telefone), 0) < 0)
     {
         perror("ERRO - send(ctS)");
     }
 
     srand(time(NULL));
     porta_recebimento = rand()%65500;
-    sprintf(buffer_envio, "%d", porta_recebimento);
+    sprintf(buffer_envio, "%i", porta_recebimento);
     if (send(socket_envia, buffer_envio, sizeof(buffer_envio), 0) < 0)
     {
         perror("ERRO - send(ctS)");
     }
+
 
     do
     {
