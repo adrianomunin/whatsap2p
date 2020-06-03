@@ -102,11 +102,10 @@ int main(int argc, char *argv[])
         printf("ERRO - Porta invalida\n");
         exit(EXIT_FAILURE);
     }
-    bind(socket_conexao, (struct sockaddr *)&servidor, sizeof(servidor));
-    if (socket_conexao < 0)
+
+    if (bind(socket_conexao, (struct sockaddr *)&servidor, sizeof(servidor)) != 0)
     {
        perror("ERRO - Bind()");
-       printf("%i",errno);
        exit(errno);
     }
     
@@ -115,6 +114,7 @@ int main(int argc, char *argv[])
         perror("ERRO - Listen()");
         exit(errno);
     }
+
     system("clear");
     printf("Servidor WhatsAp2p iniciado na porta %i\n\n",ntohs(servidor.sin_port));
 
@@ -160,17 +160,20 @@ void *thread_cliente(void *arg)
         perror("ERRO - Recv(porta,telefone");
         exit(errno);
     }
-    msg[0]=strtok(buffer_recebe,";");
-    msg[1]=strtok(NULL,";");
 
-    whoami.sin_port = htons(atoi(msg[2]));
+    msg[0]=strtok(buffer_recebe,";\n");
+    msg[1]=strtok(NULL,";\n");
+
+    whoami.sin_port = htons(atoi(msg[1]));
     cliente.localizacao = whoami;
-    cliente.telefone = msg[1];
+    cliente.telefone = msg[0];
     cliente.conectado=1;
     //Atualizacao da lista de clientes
     pthread_mutex_trylock(&mutex);
         adiciona_usuario(&lista,cliente);
     pthread_mutex_unlock(&mutex);
+
+    printf("cliente id: %s CONECTADO\n",cliente.telefone);    
     do{
         msg[1]=msg[0]=NULL;
         if(recv(socket,buffer_recebe,sizeof(buffer_recebe),0) == -1){
@@ -182,14 +185,18 @@ void *thread_cliente(void *arg)
 
         if(strcmp(msg[0],GET) == 0){
             //Requisicao de informações
-
+            printf("Requisicao GET de cliente id: %s\n",cliente.telefone);
         }
         if(strcmp(msg[0],REMOVE) == 0){
             //Requisicao de remocao
-            
+            printf("Requisicao REMOVE de cliente id: %s\n",cliente.telefone);    
+            pthread_mutex_trylock(&mutex);
+            remove_usuario(&lista,cliente.telefone);
+            pthread_mutex_unlock(&mutex);
+            close(socket);
+            printf("cliente id: %s DESCONECTADO\n",cliente.telefone);    
+            return;
         }
-        
-
     }while(strcmp(msg[0],ENCERRAR) != 0);
 
     pthread_mutex_trylock(&mutex);
@@ -253,16 +260,16 @@ int put_online(usuario **raiz,char *tel,struct sockaddr_in localizacao){
 /*Adiciona o usuario no fim da lista, caso usuario ja exista chama ´put_online´*/
 void adiciona_usuario(usuario **raiz,usuario add){
 
-    usuario *novo = (usuario *)malloc(sizeof(usuario));
-    if(novo == NULL){
-        perror("ERRO - malloc(novo)");
-        exit(errno);
-    }
 
     if(put_online(raiz,add.telefone,add.localizacao) == 1){
         return;
     }
 
+    usuario *novo = (usuario *)malloc(sizeof(usuario));
+    if(novo == NULL){
+        perror("ERRO - malloc(novo)");
+        exit(errno);
+    }
     novo->telefone = add.telefone;
     novo->conectado = add.conectado;
     novo->localizacao = add.localizacao;
