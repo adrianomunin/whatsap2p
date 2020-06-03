@@ -12,271 +12,173 @@
 #include <time.h>
 #include <pthread.h> 
 
-#define DEBUG 1
+#define porta_servidor 7325
 
-//comandos
-#define ENCERRAR "encerrar" // encerra conexao, o que torna offline
-#define GET "get" // requere informacao do servidor, necessario informar telefone
-#define REMOVE "remove" //pede a remocao dos dados do servidor, ocasiona na sua desconexao
+struct cliente
+{
+    int telefone;
+    int porta;
+    char *endereco;
+    struct cliente *prox;
 
-typedef struct no{
-    char *telefone;
-    struct sockaddr_in localizacao;
-    int conectado;
-    struct no *prox; 
-    struct no *ant;
-}usuario;
+} typedef cliente;
 
-//mutex
-pthread_mutex_t mutex;
+struct
+{
+    int socket_redirecionado;
+    char *cliente_endereco;
 
-//thread_args
-typedef struct{
-    int socket;
-    usuario *lista;
-    struct sockaddr_in myName;
+} typedef thread_args, *ptr_thread_arg;
 
-}thread_arg,*ptr_thread_arg;
+cliente *lista_clientes;
 
-//thread_func
-void *thread_cliente(void*);
-
-
-/*Remove usuario da lista, retorna 1 se sucesso*/
-int remove_usuario(usuario **raiz,char *tel);
-/*Adiciona o usuario no fim da lista, caso usuario ja exista chama ´put_online´*/
-void adiciona_usuario(usuario **raiz,usuario add);
-/*Define o usuario com ´tel´ como offline*/
-int put_offline(usuario **raiz,char *tel);
-/*Define o usuario com ´tel´ como online*/
-int put_online(usuario **raiz,char *tel,struct sockaddr_in);
-/*printa a lista*/
-void print_lista(usuario *lista){
-    while(lista!=NULL){
-        printf("Telefone: %s\tStatus: %i\n",lista->telefone,lista->conectado);
-        lista = lista->prox;
-    }
-}
-
+void *thread_cliente(void *argumentos);
+int registrar_cliente(int telefone, int porta, char *endereco);
+int excluir_cliente(int telefone);
+cliente procurar_cliente(int telefone);
 
 int main(int argc, char *argv[])
 {
-    int namelen;
+    int comprimento;
+
     int socket_conexao;
-    int socket_thread;
+    int socket_redirecionado;
 
-    struct sockaddr_in cliente; 
-    struct sockaddr_in servidor; 
-    usuario *lista=NULL;
+    char *cliente_endereco;
 
-    //variaveis thread
-    int thread_create_result;
-    pthread_t ptid;
-    thread_arg t_arg;
-    
-    //init_mutex
-    if(pthread_mutex_init(&mutex,NULL) != 0){
-        perror("ERRO - mutex_init()");
-        exit(errno);
-    }
+    struct sockaddr_in cliente;
+    struct sockaddr_in servidor;
 
-/*Configuração do servidor*/
+    pthread_t thread_id;
+    thread_args argumentos;
 
-    //Socket init
     if ((socket_conexao = socket(PF_INET, SOCK_STREAM, 0)) < 0)
-    {
-        perror("Socket()");
-        exit(errno);
-    }
+        {
+            perror("Socket()");
+            exit(2);
+        }
 
-    //Digitou errado, companheiro!
-    if(argc != 2){
-        printf("Use %s <porta>\n",argv[0]);
-        exit(EXIT_FAILURE);
-    }
-    servidor.sin_family = AF_INET;   
-    servidor.sin_port   = htons(atoi(argv[1]));      
+    servidor.sin_family = AF_INET;
+    servidor.sin_port = htons(porta_servidor);
     servidor.sin_addr.s_addr = INADDR_ANY;
 
-    if(ntohs(servidor.sin_port) == 0){
-        printf("ERRO - Porta invalida\n");
-        exit(EXIT_FAILURE);
-    }
     bind(socket_conexao, (struct sockaddr *)&servidor, sizeof(servidor));
     if (socket_conexao < 0)
     {
-       perror("ERRO - Bind()");
-       printf("%i",errno);
-       exit(errno);
+        perror("Bind()");
+        exit(3);
     }
-    
+
     if (listen(socket_conexao, 1) != 0)
     {
-        perror("ERRO - Listen()");
-        exit(errno);
+        perror("Listen()");
+        exit(4);
     }
-    system("clear");
-    printf("Servidor WhatsAp2p iniciado na porta %i\n\n",ntohs(servidor.sin_port));
 
-    do{
-        namelen = sizeof(cliente);
-        if ((socket_thread = accept(socket_conexao, (struct sockaddr *)&cliente, (socklen_t *)&namelen)) == -1)
+    do
+    {
+        comprimento = sizeof(cliente);
+        if ((socket_redirecionado = accept(socket_conexao, (struct sockaddr *)&cliente, (socklen_t *)&comprimento)) == -1)
         {
-            perror("ERRO - Accept()");
-            exit(errno);
-        }
-        t_arg.socket = socket_thread;
-        t_arg.lista = lista;
-        t_arg.myName = cliente;
-
-        thread_create_result = pthread_create(&ptid,NULL,&thread_cliente,&t_arg);
-        if(thread_create_result != 0){
-            perror("ERRO - thread_create()");
-            exit(thread_create_result);
+            perror("Accept()");
+            exit(5);
         }
 
-    }while(1);
+        cliente_endereco = inet_ntoa(cliente.sin_addr);
+
+    
+       // argumentos.cliente_endereco = cliente_endereco;
+        argumentos.socket_redirecionado = socket_redirecionado;
+        pthread_create(&thread_id, NULL, &thread_cliente, &argumentos); 
+        
+        
+    }while (1);
     close(socket_conexao);
-    pthread_mutex_destroy(&mutex);
-    printf("Servidor encerrado\n");
     return EXIT_SUCCESS;
 }
 
-void *thread_cliente(void *arg)
+void * thread_cliente(void *arg)
 {
-    char buffer_envia[80];              
-    char buffer_recebe[80];
-    char *msg[80];
-    usuario cliente;
+    ptr_thread_arg argumentos = (ptr_thread_arg)arg;
+    int socket_redirecionado = argumentos->socket_redirecionado;
+    //char *cliente_endereco = argumentos->cliente_endereco;
 
-    ptr_thread_arg thread_arg = (ptr_thread_arg)arg;
+    char buffer_envia[50];
+    char buffer_recebe[50];
 
-    int socket = thread_arg->socket;
-    usuario *lista = thread_arg->lista;
-    struct sockaddr_in whoami = thread_arg->myName; 
+    int telefone_cliente, porta_envio_cliente;
 
-    //Recebimento da porta de escuta e telefone
-    if(recv(socket,buffer_recebe,sizeof(buffer_recebe),0) == -1){
-        perror("ERRO - Recv(porta,telefone");
-        exit(errno);
+    if (recv(socket_redirecionado, buffer_recebe, sizeof(buffer_recebe), 0) == -1)
+    {
+        fprintf(stderr,"ERRO - Recv(ctS): %s\n",strerror(errno));
+        exit(-1);
     }
-    msg[0]=strtok(buffer_recebe,";");
-    msg[1]=strtok(NULL,";");
+    telefone_cliente = atoi(buffer_recebe);
 
-    whoami.sin_port = htons(atoi(msg[2]));
-    cliente.localizacao = whoami;
-    cliente.telefone = msg[1];
-    cliente.conectado=1;
-    //Atualizacao da lista de clientes
-    pthread_mutex_trylock(&mutex);
-        adiciona_usuario(&lista,cliente);
-    pthread_mutex_unlock(&mutex);
-    do{
-        msg[1]=msg[0]=NULL;
-        if(recv(socket,buffer_recebe,sizeof(buffer_recebe),0) == -1){
-            fprintf(stderr,"ERRO - Recv(): %s, cliente id: %s",strerror(errno),cliente.telefone);
-            break;
-        }
-        msg[0] = strtok(buffer_recebe,";");//comando
-        msg[1] = strtok(NULL,";");//parametros comando
+    if (recv(socket_redirecionado, buffer_recebe, sizeof(buffer_recebe), 0) == -1)
+    {
+        fprintf(stderr,"ERRO - Recv(ctS): %s\n",strerror(errno));
+        exit(-1);
+    }
+    porta_envio_cliente = atoi(buffer_recebe);
 
-        if(strcmp(msg[0],GET) == 0){
-            //Requisicao de informações
+    printf("Telefone: %d \n", telefone_cliente);
+    printf("Porta: %d\n", porta_envio_cliente);
+    //printf("Endereco: %s \n", cliente_endereco);
 
-        }
-        if(strcmp(msg[0],REMOVE) == 0){
-            //Requisicao de remocao
-            
-        }
-        
+    //registrar_cliente(telefone_cliente, porta_envio_cliente, cliente_endereco);
 
-    }while(strcmp(msg[0],ENCERRAR) != 0);
-
-    pthread_mutex_trylock(&mutex);
-        put_offline(&lista,cliente.telefone);
-    pthread_mutex_unlock(&mutex);
-    close(socket);
+    close(socket_redirecionado);
+    
+    pthread_exit(NULL);
 }
 
-int remove_usuario(usuario **raiz,char *tel){
+int registrar_cliente(int telefone, int porta, char *endereco)
+{
+    cliente *pont_auxiliar = lista_clientes;
 
-    usuario *aux = *raiz;
-    while(aux != NULL){
-        if(strcmp(aux->telefone,tel) == 0){
-            if(aux->ant == NULL){
-                *raiz = aux->prox;
-                free(aux);            
-            }else{
-                aux->ant->prox = aux->prox;
-                free(aux);
-            }
-            return 1;
-        }else{
-            aux = aux->prox;
+    if (lista_clientes == NULL)
+    {
+        lista_clientes = (cliente *)malloc(sizeof(cliente));
+        if (lista_clientes == NULL)
+        {
+            perror("Malloc");
+            return 1; //Codigo para erro
         }
+
+        lista_clientes->endereco = endereco;
+        lista_clientes->porta = porta;
+        lista_clientes->telefone = telefone;
     }
-    return 0;
+    else
+    {
+        while (pont_auxiliar->prox == NULL)
+        {
+            pont_auxiliar = pont_auxiliar->prox;
+        }
+
+        pont_auxiliar = (cliente *)malloc(sizeof(cliente));
+        if (pont_auxiliar == NULL)
+        {
+            perror("Malloc");
+            return 1; //Codigo para erro
+        }
+
+        pont_auxiliar->endereco = endereco;
+        pont_auxiliar->porta = porta;
+        pont_auxiliar->telefone = telefone;
+    }
+
+    free(pont_auxiliar);
+    return 0; //0 para OK, 1 para Erro
 }
 
-int put_offline(usuario **raiz,char *tel){
+int excluir_cliente(int telefone)
+{
 
-    usuario *aux = *raiz;
-    while(aux != NULL){
-        if(strcmp(aux->telefone,tel) == 0){
-            aux->conectado=0;
-            aux->localizacao.sin_addr.s_addr = INADDR_NONE;
-            aux->localizacao.sin_port = 0;
-            return 1;
-        }else{
-            aux = aux->prox;
-        }
-    }
-    return 0;
+    return 0; //0 para OK, 1 para Erro
 }
 
-/*Define o usuario com ´tel´ como online*/
-int put_online(usuario **raiz,char *tel,struct sockaddr_in localizacao){
-
-    usuario *aux = *raiz;
-    while(aux != NULL){
-        if(strcmp(aux->telefone,tel) == 0){
-            aux->conectado=1;
-            aux->localizacao = localizacao;
-            return 1;
-        }else{
-            aux = aux->prox;
-        }
-    }
-    return 0;
-}
-
-/*Adiciona o usuario no fim da lista, caso usuario ja exista chama ´put_online´*/
-void adiciona_usuario(usuario **raiz,usuario add){
-
-    usuario *novo = (usuario *)malloc(sizeof(usuario));
-    if(novo == NULL){
-        perror("ERRO - malloc(novo)");
-        exit(errno);
-    }
-
-    if(put_online(raiz,add.telefone,add.localizacao) == 1){
-        return;
-    }
-
-    novo->telefone = add.telefone;
-    novo->conectado = add.conectado;
-    novo->localizacao = add.localizacao;
-    novo->prox=NULL;
-        
-    if(*raiz == NULL){
-        *raiz = novo;
-        (*raiz)->ant = NULL;
-    }else{
-        usuario *aux = *raiz;
-        while(aux->prox != NULL){
-            aux = aux->prox;
-        }
-        aux->prox = novo;
-        aux->prox->ant=aux;
-    }
+cliente procurar_cliente(int telefone)
+{
 }
