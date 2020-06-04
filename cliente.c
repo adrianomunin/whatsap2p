@@ -13,12 +13,14 @@
 #include <pthread.h>
 
 //Comandos ao servidor
-#define GET "get"
+#define GETTEL "gettel"
+#define GETLOC "getloc"
 #define REMOVE "remove"
 #define ENCERRAR "encerrar"
 
 //Comandos P2P
-
+#define MSGPHOTO "msgphoto"
+#define MSGTEXT "msgtext"
 
 
 
@@ -40,7 +42,9 @@ typedef struct no{
 
 //Thread mensagens setup
 typedef struct{
-    int socket;
+    int socket_cliente;
+    int socket_server;
+    struct sockaddr_in server;
     contato *contatos;
     grupo *grupos;
 }thread_arg,*ptr_thread_arg;
@@ -98,7 +102,7 @@ int main(int argc, char *argv[])
         exit(errno);
     } 
 
-    int socket_recebe, socket_envia;
+    int socket_recebe, socket_envia_servidor,socket_envia_cliente;
     int ip_recebimento, porta_recebimento;
 
     //Setup do socket de recebimento de mensagens
@@ -145,12 +149,12 @@ int main(int argc, char *argv[])
             server.sin_addr.s_addr=inetaddr;
         }else server.sin_addr.s_addr=*((unsigned long *)hostnm->h_addr_list[0]);
 
-    if ((socket_envia = socket(PF_INET, SOCK_STREAM, 0)) < 0){
+    if ((socket_envia_servidor = socket(PF_INET, SOCK_STREAM, 0)) < 0){
         perror("ERRO - Socket(snd)");
         exit(errno);
     }
 
-    if ((connect(socket_envia, (struct sockaddr *)&server, sizeof(server))) < 0){
+    if ((connect(socket_envia_servidor, (struct sockaddr *)&server, sizeof(server))) < 0){
         perror("ERRO - Connect()");
         exit(errno);
     }
@@ -162,7 +166,7 @@ int main(int argc, char *argv[])
     strcat(buffer_envio,";");
     sprintf(aux,"%d",porta_recebimento);
     strcat(buffer_envio,aux);
-    if (send(socket_envia, buffer_envio, sizeof(buffer_envio), 0) < 0){
+    if (send(socket_envia_servidor, buffer_envio, sizeof(buffer_envio), 0) < 0){
         perror("ERRO - send(servidor)");
         exit(errno);
     }
@@ -170,7 +174,9 @@ int main(int argc, char *argv[])
 
     t_arg.contatos = contatos;
     t_arg.grupos = grupos;
-    t_arg.socket = socket_recebe;
+    t_arg.socket_cliente = socket_recebe;
+    t_arg.socket_server = socket_envia_servidor;
+    t_arg.server = server;
 
     t_creat_res = pthread_create(&ptid,NULL,&thread_msg,&t_arg);
     if(t_creat_res != 0){
@@ -193,6 +199,12 @@ int main(int argc, char *argv[])
         {
         case 1: //Enviar Msg
         {
+            //Ordem de envio:
+            //Tipo da mensagem - MSGTEXT ou MSGPHOTO
+            //Tamanho da mensagem
+            //A mensagem em si
+
+
         }
         break;
 
@@ -219,12 +231,117 @@ int main(int argc, char *argv[])
     } while (operacao != 0);
 
 
-    if(send(socket_envia,ENCERRAR,sizeof(ENCERRAR),0)<0){
+    if(send(socket_envia_servidor,ENCERRAR,sizeof(ENCERRAR),0)<0){
         perror("ERRO - send(ENCERRAR)");
     }
     pthread_cancel(ptid);
     close(socket_recebe);
-    close(socket_envia);
+    close(socket_envia_servidor);
+    close(socket_envia_cliente);
+    pthread_mutex_destroy(&mutex);
+    free(contatos);
+    free(grupos);
+}
+
+
+void * thread_msg(void *arg){
+
+    ptr_thread_arg thread_arg = (ptr_thread_arg)arg;
+
+    int socket_cliente = thread_arg->socket_cliente;
+    int socket_server = thread_arg->socket_server;
+    contato *contatos = thread_arg->contatos;
+    grupo *grupos = thread_arg->grupos;
+
+    struct sockaddr_in cliente;
+    int socket_accept,namelen;
+
+    char *buffer_msg; //buffer dinamico para corpo da msg
+    char buffer_comando[80];//buffer estatico para o comando: RCVMSG, RCVPHOTO
+    ssize_t size;
+    FILE *fp;
+    char path[1000];
+    char timestamp[100];
+    char msgtype[80];
+    time_t rawtime;
+    struct tm * timeinfo;
+
+    do{
+        namelen = sizeof(cliente);
+        if((socket_accept = accept(socket_cliente,(struct sockaddr *)&cliente,(socklen_t *)&namelen))== -1){
+            perror("ERRO - accept(thread)");
+            exit(errno);
+        }
+
+        //Conexao de um cliente aceita, recebendo tipo de msg, foto ou texto
+        if(recv(socket_accept,buffer_comando,sizeof(size),0) == -1){
+            perror("ERRO - recv(thread");
+            exit(errno);
+        }
+        memcpy(msgtype,sizeof(msgtype),buffer_comando);
+
+        //recebo o tamanho da mensagem
+        if(recv(socket_accept,buffer_comando,sizeof(size),0) == -1){
+            perror("ERRO - recv(thread");
+            exit(errno);
+        }
+        size = atol(buffer_comando);
+        buffer_msg = malloc(size);
+
+        //recebo o corpo da mensagem
+        if(recv(socket_accept,buffer_msg,sizeof(size),0) == -1){
+            perror("ERRO - recv(thread");
+            exit(errno);
+        }
+
+        //se for arquivo escrevo no disco
+        if(strcmp(msgtype,MSGPHOTO) == 0){
+            //gero a timestamp = [info de data/hora]telefone
+            time(&rawtime);
+            timeinfo = localtime(&rawtime);
+            strcat(timestamp,"[");
+            strcat(timestamp,asctime(timeinfo));
+            strcat(timestamp,"]");
+
+            //pergunto ao servidor telefone de quem enviou
+            strcat(buffer_comando,GETTEL);
+            strcat(buffer_comando,";");
+            strcat(buffer_comando,inet_ntoa(cliente.sin_addr));
+            strcat(buffer_comando,";");
+            strcat(buffer_comando,ntohs(cliente.sin_port));
+            if(send(socket_server,buffer_comando,sizeof(buffer_comando),0) < 0){
+                perror("ERRO - send(thread)");
+                exit(errno);
+            }
+            if(recv(socket_server,buffer_comando,sizeof(buffer_comando),0) == -1){
+                perror("ERRO - recv(thread)");
+                exit(errno);
+            }
+            strcat(timestamp,buffer_comando);
+
+            //buffermsg tera o retorno de um fread, verifico se houve erros
+            if(strcmp(strerror(atoi(buffer_msg)),"Success") == 0){
+                            getcwd(path,sizeof(path));
+                            strcat(path,"/");
+                            strcat(path,timestamp);
+                            fp = fopen(path,"wb");
+                            fwrite(buffer_msg,size,1,fp);
+                            fclose(fp);
+            }
+
+        }
+
+        //se for text exibo um notificacao e a msg na tela
+        if(strcmp(msgtype,MSGTEXT)==0){
+            
+            
+
+        }
+
+        free(buffer_msg);
+    
+    }while(1);
+
 }
 
 

@@ -16,7 +16,8 @@
 
 //comandos
 #define ENCERRAR "encerrar" // encerra conexao, o que torna offline
-#define GET "get" // requere informacao do servidor, necessario informar telefone
+#define GETLOC "getloc" // requere informacao do servidor, necessario informar telefone
+#define GETTEL "gettel" // requere informacao do servidor, necessario informar telefone
 #define REMOVE "remove" //pede a remocao dos dados do servidor, ocasiona na sua desconexao
 
 typedef struct no{
@@ -182,11 +183,18 @@ void *thread_cliente(void *arg)
         }
         msg[0] = strtok(buffer_recebe,";");//comando
         msg[1] = strtok(NULL,";");//parametros comando
+        msg[2] = strtok(NULL,";");//parametros comando
 
-        if(strcmp(msg[0],GET) == 0){
+        if(strcmp(msg[0],GETLOC) == 0){
             //Requisicao de informações
-            printf("Requisicao GET de cliente id: %s\n",cliente.telefone);
+            printf("Requisicao GETLOC de cliente id: %s\n",cliente.telefone);
         }
+
+        if(strcmp(msg[0],GETTEL) == 0){
+            //Requisicao de informações
+            printf("Requisicao GETTEL de cliente id: %s\n",cliente.telefone);
+        }
+
         if(strcmp(msg[0],REMOVE) == 0){
             //Requisicao de remocao
             printf("Requisicao REMOVE de cliente id: %s\n",cliente.telefone);    
