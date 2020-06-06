@@ -218,11 +218,11 @@ int main(int argc, char *argv[])
             //A mensagem em si
 
             //Printo todos os contatos
-            printf("\t\tNumero de contatos: %d",countContatos);
+            printf("\t\tNumero de contatos: %d\n\n",countContatos);
             i=0;
             while(contatos!=NULL){
                 i++;
-                printf("Nome: %s\tTelefone: %s\n",contatos->nome,contatos->telefone);
+                printf("#%i - Nome: %s\tTelefone: %s\n",i,contatos->nome,contatos->telefone);
                 contatos = contatos->prox;
             }
             printf("Qual contato?\n");
@@ -382,7 +382,7 @@ int main(int argc, char *argv[])
             scanf("%s",contatoPraAdd.nome);
             memcpy(contatoPraAdd.telefone,telefone,sizeof(telefone));
             contatoPraAdd.localizacao.sin_addr.s_addr = inet_addr(msg[0]);
-            contatoPraAdd.localizacao.sin_port = htons(atoi(msg[2]));
+            contatoPraAdd.localizacao.sin_port = htons(atoi(msg[1]));
              if(adiciona_contato(&contatos,contatoPraAdd) == 0){
                  printf("Contato adicionado!\n");
                  countContatos+=1;

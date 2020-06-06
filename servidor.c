@@ -188,9 +188,9 @@ void *thread_cliente(void *arg)
             fprintf(stderr,"ERRO - Recv(): %s, cliente id: %s\n",strerror(errno),cliente.telefone);
             break;
         }
-        msg[0] = strtok(buffer_recebe,";");//comando
-        msg[1] = strtok(NULL,";");//parametros (ip/hostname,telefone)
-        msg[2] = strtok(NULL,";");//parametros ip/hostname (porta) ,se msg[1]=telefone msg[2]=NULL
+        msg[0] = strtok(buffer_recebe,";\n");//comando
+        msg[1] = strtok(NULL,";\n");//parametros (ip/hostname,telefone)
+        msg[2] = strtok(NULL,";\n");//parametros ip/hostname (porta) ,se msg[1]=telefone msg[2]=NULL
         
         #ifdef DEBUG
         printf("Comando recebido= %s - %s - %s\n\n",msg[0],msg[1],msg[2]);
