@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdio_ext.h>
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
@@ -10,6 +11,7 @@
 #include <errno.h>
 #include <arpa/inet.h>
 #include <time.h>
+#include <sys/sem.h>
 #include <pthread.h>
 
 //Comandos ao servidor
@@ -17,27 +19,27 @@
 #define GETLOC "getloc"
 #define REMOVE "remove"
 #define ENCERRAR "encerrar"
-
+#define NOTFOUND "notfound"
 //Comandos P2P
 #define MSGPHOTO "msgphoto"
 #define MSGTEXT "msgtext"
 
+#define DEBUG 1
 
-
-typedef struct no{
-    char *telefone;
+typedef struct noC{
+    char telefone[20];
     char *nome;
     struct sockaddr_in localizacao;
-    struct no *prox;
-    struct no *ant;
+    struct noC *prox;
+    struct noC *ant;
 }contato;
 
-typedef struct no{
+typedef struct noG{
     contato *membros;
     int qtd;
     char *nome;
-    struct no *prox;
-    struct no *ant;
+    struct noG *prox;
+    struct noG *ant;
 }grupo;
 
 //Thread mensagens setup
@@ -56,7 +58,7 @@ void *thread_msg(void*);
 /*Remove usuario da lista, retorna 1 se sucesso*/
 int remove_contato(contato **raiz,char *tel);
 /*Adiciona o usuario no fim da lista, caso usuario ja exista nada eh feito*/
-void adiciona_contato(contato **raiz,contato add);
+int adiciona_contato(contato **raiz,contato add);
 
 
 /*Remove grupo da lista, retorna 1 se sucesso*/
@@ -64,19 +66,13 @@ int remove_grupo(grupo **raiz,char *nome);
 /*Adiciona o usuario no fim da lista, caso usuario ja exista nada eh feito*/
 void cria_grupo(grupo **raiz,grupo add);
 /*Adiciona o usuario no fim da lista, caso usuario ja exista nada eh feito*/
-void adiciona_membro(grupo **raiz,contato add,char *nome);
+int adiciona_membro(grupo **raiz,contato add,char *nome);
 /*Remove usuario da lista, retorna 1 se sucesso*/
 int remove_membro(grupo **raiz,char *tel);
-
-
-/*printa a lista
-void print_lista(grupo *lista){
-    while(lista!=NULL){
-        printf("Telefone: %s\tStatus: %i\n",lista->telefone,lista->conectado);
-        lista = lista->prox;
-    }
-}
-*/
+/*Procura contato na lista 1 se existe 0 se nao*/
+int searchContato(contato **raiz,char *tel);
+/*Procura grupo na lista 1 se existe 0 se nao*/
+int searchGrupo(grupo **raiz,char *nome);
 
 
 int main(int argc, char *argv[])
@@ -86,6 +82,11 @@ int main(int argc, char *argv[])
     char buffer_envio[50],aux[50];
     char buffer_recebimento[50];
     char telefone[20];
+    char path[100];
+    char *msg[80];
+    char *fileBuf;
+    ssize_t size;
+    FILE *fp;
 
     struct hostent *hostnm;
     int inetaddr;
@@ -94,9 +95,18 @@ int main(int argc, char *argv[])
     grupo *grupos=NULL;
     contato *contatos=NULL;
 
+    contato contatoPraEnviar,contatoPraAdd;
+    grupo grupoPraEnviar;
+
     int t_creat_res;
     pthread_t ptid;
     thread_arg t_arg;
+
+
+    int countContatos=0;
+    int countGrupos=0;
+    int i,ret;
+
     if(pthread_mutex_init(&mutex,NULL)!=0){
         perror("ERRO - mutex_init()");
         exit(errno);
@@ -160,6 +170,7 @@ int main(int argc, char *argv[])
     }
 
     printf("Informe seu telefone: ");
+    __fpurge(stdin);
     fgets(telefone,sizeof(telefone),stdin);
 
     strcat(buffer_envio,telefone);
@@ -189,12 +200,14 @@ int main(int argc, char *argv[])
         printf("WhatsAp2p\n");
         printf("1 - Enviar Mensagem. \n");
         printf("2 - Criar Grupo. \n");
-        printf("3 - Contatos. \n");
+        printf("3 - Adicionar Contato. \n");
         printf("4 - Creditos.\n");
-        printf("0 - sair. \n");
+        printf("0 - Sair. \n>");
+        __fpurge(stdin);
         scanf("%i", &operacao);
         //system("clear");
-
+        strcpy(buffer_envio,"");
+        strcpy(buffer_recebimento,"");
         switch (operacao)
         {
         case 1: //Enviar Msg
@@ -204,6 +217,118 @@ int main(int argc, char *argv[])
             //Tamanho da mensagem
             //A mensagem em si
 
+            //Printo todos os contatos
+            printf("\t\tNumero de contatos: %d",countContatos);
+            i=0;
+            while(contatos!=NULL){
+                i++;
+                printf("Nome: %s\tTelefone: %s\n",contatos->nome,contatos->telefone);
+                contatos = contatos->prox;
+            }
+            printf("Qual contato?\n");
+            __fpurge(stdin);
+            scanf("%i",&operacao);
+            if(operacao>i || operacao > countContatos || operacao<=0){
+                printf("Selecao invalida\n");
+                break;
+            }
+            //seleciono o contato requisitado
+            while(contatos!=NULL){
+                i--;
+                if(i==0){
+                    printf("SELECIONADO - Nome: %s\tTelefone: %s\n",contatos->nome,contatos->telefone);
+                    contatoPraEnviar=*contatos;
+                    break;
+                }
+                contatos = contatos->prox;
+            }
+            printf("O que deseja enviar para %s?\n",contatoPraEnviar.nome);
+            printf("1 - Foto\n");
+            printf("2 - Texto\n");
+            printf("0 - Cancelar\n");
+            __fpurge(stdin);
+            scanf("%i",&operacao);
+            if(operacao == 0)break;
+            if(connect(socket_envia_cliente,(struct sockaddr *)&contatoPraEnviar.localizacao,sizeof(contatoPraEnviar.localizacao))){
+                    perror("ERRO - connect2client");
+                    break;
+            }
+            switch (operacao)
+            {
+            case 1:
+                printf("Enviar Foto\n\n");
+                //envio o tipo de mensagem
+                if(send(socket_envia_cliente,MSGPHOTO,sizeof(MSGPHOTO),0) < 0){
+                        perror("ERRO - send2client");
+                        break;
+                }
+                //gero o caminho do arquivo solicitado
+                getcwd(path,sizeof(path));
+                strcat(path,"/");
+                strcat(path,aux);
+
+                fp = fopen(path,"rb");
+
+                if(fp) {
+                    //determino o tamanho do arquivo    
+                    fseek(fp,0,SEEK_END);
+                    size = ftell(fp);
+                    fseek(fp,0,SEEK_SET);
+                    fileBuf = malloc(size);
+                    fread(fileBuf,size,1,fp);
+                    fclose(fp);
+                    //envio o tamanho do arquivo primeiro
+                    sprintf(buffer_envio,"%lu",size);
+                    if(send(socket_envia_cliente,buffer_envio,sizeof(buffer_envio),0) < 0){
+                        perror("ERRO - send2client");
+                        break;
+                    }
+                    //depois o arquivo em si
+                    if((send(socket_envia_cliente,fileBuf,size,0)) < 0){
+                        perror("ERRO - send2client");
+                        break;
+                    }
+                    free(fileBuf);
+                    printf("Arquivo enviado!");
+                }else{ 
+                    //Falha na leitura
+                    perror("ERRO - read");
+                    break;
+                }
+                break;
+            
+            case 2:
+                printf("Enviar Texto\n\n");
+                //envio o tipo de mensagem
+                if(send(socket_envia_cliente,MSGTEXT,sizeof(MSGTEXT),0) < 0){
+                        perror("ERRO - send2client");
+                        break;
+                }
+                printf("Digite a mensagem\n>");
+                __fpurge(stdin);
+                fgets(buffer_envio,sizeof(buffer_envio),stdin);
+                
+                //envio o tamanho da mensagem
+                sprintf(aux,"%lu",sizeof(buffer_envio));
+                if(send(socket_envia_cliente,aux,sizeof(aux),0)<0){
+                    perror("ERRO - send2client");
+                    break;
+                }
+                //depois a mensagem em si
+                if(send(socket_envia_cliente,buffer_envio,sizeof(buffer_envio),0)<0){
+                    perror("ERRO - send2client");
+                    break;
+                }
+                printf("Mensagem enviada!\n");
+                break;
+            
+            case 0:
+                break;
+            
+            default:
+                printf("Selecao invalida\n");
+                break;
+            }
 
         }
         break;
@@ -215,6 +340,55 @@ int main(int argc, char *argv[])
 
         case 3: //Adc Contato
         {
+            printf("Digite o telefone\n");
+            __fpurge(stdin);
+            fgets(telefone,sizeof(telefone),stdin);
+            if (searchContato(&contatos,telefone)==1){
+                printf("Contato existente!\n");
+                break;
+            }
+            //gero a requisicao
+            strcat(buffer_envio,GETLOC);
+            strcat(buffer_envio,";");
+            strcat(buffer_envio,telefone);
+            #ifdef DEBUG
+            printf("Comando enviado= %s\n\n",buffer_envio);
+            #endif
+
+            if(send(socket_envia_servidor,buffer_envio,sizeof(buffer_envio),0)<0){
+                perror("ERRO - send2server");
+                exit(errno);
+            }
+
+            if(recv(socket_envia_servidor,buffer_recebimento,sizeof(buffer_recebimento),0)<0){
+                perror("ERRO - recvFromServer");
+                exit(errno);
+            }
+            //tokenizo a resposta da requisicao, msg[0] tera ip/hostname, msg[1] tera porta
+            //se telefone nao encontrado msg[0] = NOTFOUND
+            msg[0]=strtok(buffer_recebimento,";");
+            msg[1]=strtok(NULL,";");
+            
+            #ifdef DEBUG
+            printf("Comando recebido= %s - %s\n\n",msg[0],msg[1]);
+            #endif
+
+            if(strcmp(msg[0],NOTFOUND)==0){
+                printf("Telefone nao encontrado!\n");
+                break;
+            }
+            printf("Digite o nome\n");
+            __fpurge(stdin);
+            scanf("%s",contatoPraAdd.nome);
+            memcpy(contatoPraAdd.telefone,telefone,sizeof(telefone));
+            contatoPraAdd.localizacao.sin_addr.s_addr = inet_addr(msg[0]);
+            contatoPraAdd.localizacao.sin_port = htons(atoi(msg[2]));
+             if(adiciona_contato(&contatos,contatoPraAdd) == 0){
+                 printf("Contato adicionado!\n");
+                 countContatos+=1;
+             }else{
+                 printf("Contato ja existente!");
+             }
         }
         break;
 
@@ -223,6 +397,8 @@ int main(int argc, char *argv[])
         }
         break;
 
+        case 0:
+            break;
         default:
             printf("Nao entendi o que voce quer!\n");
             break;
@@ -258,6 +434,7 @@ void * thread_msg(void *arg){
 
     char *buffer_msg; //buffer dinamico para corpo da msg
     char buffer_comando[80];//buffer estatico para o comando: RCVMSG, RCVPHOTO
+    char aux[80];
     ssize_t size;
     FILE *fp;
     char path[1000];
@@ -278,7 +455,7 @@ void * thread_msg(void *arg){
             perror("ERRO - recv(thread");
             exit(errno);
         }
-        memcpy(msgtype,sizeof(msgtype),buffer_comando);
+        memcpy(msgtype,buffer_comando,sizeof(msgtype));
 
         //recebo o tamanho da mensagem
         if(recv(socket_accept,buffer_comando,sizeof(size),0) == -1){
@@ -308,7 +485,11 @@ void * thread_msg(void *arg){
             strcat(buffer_comando,";");
             strcat(buffer_comando,inet_ntoa(cliente.sin_addr));
             strcat(buffer_comando,";");
-            strcat(buffer_comando,ntohs(cliente.sin_port));
+            sprintf(aux,"%d",ntohs(cliente.sin_port));
+            strcat(buffer_comando,aux);
+            #ifdef DEBUG
+            printf("Comando enviado= %s\n\n",buffer_comando);
+            #endif
             if(send(socket_server,buffer_comando,sizeof(buffer_comando),0) < 0){
                 perror("ERRO - send(thread)");
                 exit(errno);
@@ -317,6 +498,9 @@ void * thread_msg(void *arg){
                 perror("ERRO - recv(thread)");
                 exit(errno);
             }
+            #ifdef DEBUG
+            printf("Comando recebido= %s\n\n",buffer_comando);
+            #endif
             strcat(timestamp,buffer_comando);
 
             //buffermsg tera o retorno de um fread, verifico se houve erros
@@ -333,7 +517,7 @@ void * thread_msg(void *arg){
 
         //se for text exibo um notificacao e a msg na tela
         if(strcmp(msgtype,MSGTEXT)==0){
-            
+            printf("MENSAGEM RECEBIDA\n");
             
 
         }
@@ -411,10 +595,10 @@ int remove_grupo(grupo **raiz,char *nome){
     return 0;
 }
 
-void adiciona_contato(contato **raiz,contato add){
+int adiciona_contato(contato **raiz,contato add){
 
     if(searchContato(raiz,add.telefone) == 1){
-        return;
+        return -1;
     }
 
     contato *novo = (contato *)malloc(sizeof(contato));
@@ -423,7 +607,7 @@ void adiciona_contato(contato **raiz,contato add){
         exit(errno);
     }
 
-    novo->telefone = add.telefone;
+    strcpy(novo->telefone,add.telefone);
     novo->nome = add.nome;
     novo->localizacao = add.localizacao;
     novo->prox=NULL;
@@ -439,16 +623,17 @@ void adiciona_contato(contato **raiz,contato add){
         aux->prox = novo;
         aux->prox->ant=aux;
     }
+    return 0;
 }
 
-void adiciona_membro(grupo **raiz,contato add,char *nome){
+int adiciona_membro(grupo **raiz,contato add,char *nome){
 
     contato *novo = (contato *)malloc(sizeof(contato));
     if(novo == NULL){
         perror("ERRO - malloc(novo)");
         exit(errno);
     }
-    novo->telefone = add.telefone;
+    strcpy(novo->telefone,add.telefone);
     novo->nome = add.nome;
     novo->localizacao = add.localizacao;
     novo->prox=NULL;
@@ -457,9 +642,10 @@ void adiciona_membro(grupo **raiz,contato add,char *nome){
     while(*raiz != NULL){
 
         if(strcmp((*raiz)->nome,nome) == 0){
-            if(searchContato((*raiz)->membros,add.telefone) == 1){
+
+            if(searchContato(&(*raiz)->membros,add.telefone) == 1){
                 free(novo);
-                return;
+                return -1;
             }
             contato *mem = (*raiz)->membros;
 
@@ -474,7 +660,7 @@ void adiciona_membro(grupo **raiz,contato add,char *nome){
                 mem->prox->ant=mem;   
             }
             (*raiz)->qtd+=1;
-            return;
+            return 0;
         }else{
             (*raiz) = (*raiz)->prox;
         }
