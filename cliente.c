@@ -366,13 +366,17 @@ int main(int argc, char *argv[])
             }
             //tokenizo a resposta da requisicao, msg[0] tera ip/hostname, msg[1] tera porta
             //se telefone nao encontrado msg[0] = NOTFOUND
-            msg[0]=strtok(buffer_recebimento,";");
-            msg[1]=strtok(NULL,";");
+            msg[0]=strtok(buffer_recebimento,";\n");
+            msg[1]=strtok(NULL,";\n");
             
             #ifdef DEBUG
             printf("Comando recebido= %s - %s\n\n",msg[0],msg[1]);
             #endif
 
+            if(msg[0] == NULL || msg[1] == NULL){
+                printf("ERRO - getloc received NULL\n");
+                break;
+            }
             if(strcmp(msg[0],NOTFOUND)==0){
                 printf("Telefone nao encontrado!\n");
                 break;

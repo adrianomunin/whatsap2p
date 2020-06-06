@@ -171,7 +171,8 @@ void *thread_cliente(void *arg)
 
     msg[0]=strtok(buffer_recebe,";\n");
     msg[1]=strtok(NULL,";\n");
-
+    
+    
     whoami.sin_port = htons(atoi(msg[1]));
     cliente.localizacao = whoami;
     strcpy(cliente.telefone,msg[0]);
@@ -184,6 +185,8 @@ void *thread_cliente(void *arg)
     printf("cliente id: %s CONECTADO\n",cliente.telefone);   
     do{
         msg[2]=msg[1]=msg[0]=NULL;
+        strcpy(buffer_envia,"");
+        strcpy(buffer_recebe,"");
         if(recv(socket,buffer_recebe,sizeof(buffer_recebe),0) == -1){
             fprintf(stderr,"ERRO - Recv(): %s, cliente id: %s\n",strerror(errno),cliente.telefone);
             break;
