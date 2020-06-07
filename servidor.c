@@ -237,19 +237,12 @@ void *thread_cliente(void *arg)
             }
         }
 
-        if(strcmp(msg[0],REMOVE) == 0){
-            //Requisicao de remocao
-            printf("Requisicao REMOVE de cliente id: %s\n",cliente.telefone);    
-            pthread_mutex_trylock(&mutex);
-            remove_usuario(cliente.telefone);
-            pthread_mutex_unlock(&mutex);
-            close(socket);
-            printf("cliente id: %s REMOVIDO\n",cliente.telefone);    
-            return 0;
-        }
     }while(strcmp(msg[0],ENCERRAR) != 0);
 
     close(socket);
+    pthread_mutex_trylock(&mutex);
+    remove_usuario(cliente.telefone);
+    pthread_mutex_unlock(&mutex);
     printf("cliente id: %s DESCONECTADO\n",cliente.telefone);    
 }
 

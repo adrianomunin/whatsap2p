@@ -28,7 +28,7 @@
 
 typedef struct noC{
     char telefone[20];
-    char *nome;
+    char nome[50];
     struct sockaddr_in localizacao;
     struct noC *prox;
     struct noC *ant;
@@ -114,6 +114,14 @@ int main(int argc, char *argv[])
 
     int socket_recebe, socket_envia_servidor,socket_envia_cliente;
     int ip_recebimento, porta_recebimento;
+
+
+    //Setup do socket de envio de mensagens ao cliente
+    if((socket_envia_cliente = socket(PF_INET,SOCK_STREAM,0)) < 0){
+        perror("ERRO - Socket(recv)");
+        exit(errno);
+    }
+
 
     //Setup do socket de recebimento de mensagens
     if((socket_recebe = socket(PF_INET,SOCK_STREAM,0)) < 0){
@@ -286,7 +294,7 @@ int main(int argc, char *argv[])
 
             contatoPraEnviar.localizacao.sin_addr.s_addr = inet_addr(msg[0]);
             contatoPraEnviar.localizacao.sin_port = htons(atoi(msg[1]));
-
+            contatoPraEnviar.localizacao.sin_family = AF_INET;
 
 
 
@@ -407,7 +415,7 @@ int main(int argc, char *argv[])
 
             printf("Digite o nome\n");
             __fpurge(stdin);
-            scanf("%s",contatoPraAdd.nome);
+            fgets(contatoPraAdd.nome,sizeof(contatoPraAdd.nome),stdin);
 
             memcpy(contatoPraAdd.telefone,telefone,sizeof(telefone));
 
@@ -636,7 +644,7 @@ int adiciona_contato(contato **raiz,contato add){
     }
 
     strcpy(novo->telefone,add.telefone);
-    novo->nome = add.nome;
+    strcpy(novo->nome,add.nome);
     novo->prox=NULL;
         
     if(*raiz == NULL){
@@ -661,7 +669,7 @@ int adiciona_membro(grupo **raiz,contato add,char *nome){
         exit(errno);
     }
     strcpy(novo->telefone,add.telefone);
-    novo->nome = add.nome;
+    strcpy(novo->nome,add.nome);
     novo->localizacao = add.localizacao;
     novo->prox=NULL;
 
