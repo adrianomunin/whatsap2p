@@ -189,8 +189,6 @@ void *thread_cliente(void *arg)
         adiciona_usuario(cliente);
     pthread_mutex_unlock(&mutex);
 
-    print_lista();
-
     printf("cliente id: %s CONECTADO\n",cliente.telefone);   
     do{
         msg[2]=msg[1]=msg[0]=NULL;
@@ -208,6 +206,7 @@ void *thread_cliente(void *arg)
         printf("Comando recebido= %s - %s - %s\n\n",msg[0],msg[1],msg[2]);
         #endif
 
+        if(msg[0] == NULL) break;
         if(strcmp(msg[0],GETLOC) == 0){
             //Requisicao de informações de localizacao
             printf("Requisicao GETLOC de cliente id: %s\n",cliente.telefone);
@@ -254,7 +253,6 @@ struct sockaddr_in getLoc(char *telefone){
     usuario *lista = listaDeUsuarios;
 
     while(lista != NULL){
-        printf("Telefone %s\n",lista->telefone);
         if(strcmp(lista->telefone,telefone) == 0){
             return lista->localizacao;
         }    

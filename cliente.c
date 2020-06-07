@@ -44,35 +44,37 @@ typedef struct noG{
 
 //Thread mensagens setup
 typedef struct{
-    int socket_cliente;
     int socket_server;
+    int socket_recebe_cliente;
     struct sockaddr_in server;
-    contato *contatos;
-    grupo *grupos;
 }thread_arg,*ptr_thread_arg;
 
 pthread_mutex_t mutex;
 
+//lista de contatos e grupos
+grupo *listaGrupos=NULL;
+contato *listaContatos=NULL;
+
 void *thread_msg(void*);
 
 /*Remove usuario da lista, retorna 1 se sucesso*/
-int remove_contato(contato **raiz,char *tel);
+int remove_contato(char *tel);
 /*Adiciona o usuario no fim da lista, caso usuario ja exista nada eh feito*/
-int adiciona_contato(contato **raiz,contato add);
+int adiciona_contato(contato add);
 
 
 /*Remove grupo da lista, retorna 1 se sucesso*/
-int remove_grupo(grupo **raiz,char *nome);
+int remove_grupo(char *nome);
 /*Adiciona o usuario no fim da lista, caso usuario ja exista nada eh feito*/
-void cria_grupo(grupo **raiz,grupo add);
+void cria_grupo(grupo add);
 /*Adiciona o usuario no fim da lista, caso usuario ja exista nada eh feito*/
-int adiciona_membro(grupo **raiz,contato add,char *nome);
+int adiciona_membro(contato add,char *nome);
 /*Remove usuario da lista, retorna 1 se sucesso*/
-int remove_membro(grupo **raiz,char *tel);
+int remove_membro(char *tel);
 /*Procura contato na lista 1 se existe 0 se nao*/
-int searchContato(contato **raiz,char *tel);
+int searchContato(contato *lista,char *tel);
 /*Procura grupo na lista 1 se existe 0 se nao*/
-int searchGrupo(grupo **raiz,char *nome);
+int searchGrupo(char *nome);
 
 
 int main(int argc, char *argv[])
@@ -92,8 +94,9 @@ int main(int argc, char *argv[])
     int inetaddr;
     struct sockaddr_in server,myself;
 
-    grupo *grupos=NULL;
-    contato *contatos=NULL;
+   
+    contato *auxContato;
+    grupo *auxGrupo;
 
     contato contatoPraEnviar,contatoPraAdd;
     grupo grupoPraEnviar;
@@ -112,23 +115,15 @@ int main(int argc, char *argv[])
         exit(errno);
     } 
 
-    int socket_recebe, socket_envia_servidor,socket_envia_cliente;
+    int socket_recebe_cliente,socket_envia_servidor,socket_envia_cliente;
     int ip_recebimento, porta_recebimento;
-
-
-    //Setup do socket de envio de mensagens ao cliente
-    if((socket_envia_cliente = socket(PF_INET,SOCK_STREAM,0)) < 0){
+    int bindReturn;
+    
+     //Setup do socket de recebimento de mensagens
+    if((socket_recebe_cliente = socket(PF_INET,SOCK_STREAM,0)) < 0){
         perror("ERRO - Socket(recv)");
         exit(errno);
     }
-
-
-    //Setup do socket de recebimento de mensagens
-    if((socket_recebe = socket(PF_INET,SOCK_STREAM,0)) < 0){
-        perror("ERRO - Socket(recv)");
-        exit(errno);
-    }
-
     myself.sin_addr.s_addr = INADDR_ANY;
     myself.sin_family = AF_INET;
     srand(time(NULL));
@@ -136,10 +131,10 @@ int main(int argc, char *argv[])
 
         porta_recebimento = rand()%65500;
         myself.sin_port = htons(porta_recebimento);
-        
-    }while(bind(socket_recebe,(struct sockaddr *)&myself,sizeof(myself)) != 0);
+        bindReturn = bind(socket_recebe_cliente,(struct sockaddr *)&myself,sizeof(myself));
+    }while( bindReturn != 0);
 
-    if(listen(socket_recebe,1) != 0){
+    if(listen(socket_recebe_cliente,1) != 0){
         perror("ERRO - Listen()");
         exit(errno);
     }
@@ -192,10 +187,8 @@ int main(int argc, char *argv[])
     }
     //Conectado ao servidor, lancando thread de mensagens
 
-    t_arg.contatos = contatos;
-    t_arg.grupos = grupos;
-    t_arg.socket_cliente = socket_recebe;
     t_arg.socket_server = socket_envia_servidor;
+    t_arg.socket_recebe_cliente = socket_recebe_cliente;
     t_arg.server = server;
 
     t_creat_res = pthread_create(&ptid,NULL,&thread_msg,&t_arg);
@@ -229,10 +222,11 @@ int main(int argc, char *argv[])
             //Printo todos os contatos
             printf("\t\tNumero de contatos: %d\n\n",countContatos);
             i=0;
-            while(contatos!=NULL){
+            auxContato = listaContatos;
+            while(auxContato!=NULL){
                 i++;
-                printf("#%i - Nome: %s\tTelefone: %s\n",i,contatos->nome,contatos->telefone);
-                contatos = contatos->prox;
+                printf("#%i - Nome: %s\tTelefone: %s\n",i,auxContato->nome,auxContato->telefone);
+                auxContato = auxContato->prox;
             }
             printf("Qual contato?\n");
             __fpurge(stdin); 
@@ -243,24 +237,23 @@ int main(int argc, char *argv[])
                 break;
             }
             //seleciono o contato requisitado
-            while(contatos!=NULL){
+            
+            auxContato = listaContatos;
+            while(auxContato!=NULL){
                 i--;
                 if(i==0){
-                    printf("SELECIONADO - Nome: %s\tTelefone: %s\n",contatos->nome,contatos->telefone);
-                    contatoPraEnviar=*contatos;
+                    printf("SELECIONADO - Nome: %s\tTelefone: %s\n",auxContato->nome,auxContato->telefone);
+                    strcpy(contatoPraEnviar.nome,auxContato->nome);
+                    strcpy(contatoPraEnviar.telefone,auxContato->telefone);
+                    
                     break;
                 }
-                contatos = contatos->prox;
+                auxContato = auxContato->prox;
             }
-
-
-
-
-
 
             strcat(buffer_envio,GETLOC);
             strcat(buffer_envio,";");
-            strcat(buffer_envio,telefone);
+            strcat(buffer_envio,contatoPraEnviar.telefone);
             #ifdef DEBUG
             printf("Comando enviado= %s\n\n",buffer_envio);
             #endif
@@ -288,7 +281,7 @@ int main(int argc, char *argv[])
                 break;
             }
             if(strcmp(msg[0],NOTFOUND)==0){
-                printf("Telefone nao encontrado!\n");
+                printf("Telefone nao offline ou inexistente!\n");
                 break;
             }
 
@@ -312,6 +305,11 @@ int main(int argc, char *argv[])
 
             if(operacao == 0)break;
 
+            //Setup do socket de envio de mensagens ao cliente
+            if((socket_envia_cliente = socket(PF_INET,SOCK_STREAM,0)) < 0){
+                perror("ERRO - Socket(recv)");
+                exit(errno);
+            }
             if(connect(socket_envia_cliente,(struct sockaddr *)&contatoPraEnviar.localizacao,sizeof(contatoPraEnviar.localizacao))){
                     perror("ERRO - connect2client");
                     break;
@@ -395,6 +393,7 @@ int main(int argc, char *argv[])
             }
 
         }
+        close(socket_envia_cliente);
         break;
 
         case 2: //Criar Grupo
@@ -408,7 +407,7 @@ int main(int argc, char *argv[])
             __fpurge(stdin);
             fgets(telefone,sizeof(telefone),stdin);
 
-            if (searchContato(&contatos,telefone)==1){
+            if (searchContato(listaContatos,telefone)==1){
                 printf("Contato existente!\n");
                 break;
             }
@@ -419,7 +418,7 @@ int main(int argc, char *argv[])
 
             memcpy(contatoPraAdd.telefone,telefone,sizeof(telefone));
 
-            if(adiciona_contato(&contatos,contatoPraAdd) == 0){
+            if(adiciona_contato(contatoPraAdd) == 0){
                  printf("Contato adicionado!\n");
                  countContatos+=1;
              }else{
@@ -447,12 +446,12 @@ int main(int argc, char *argv[])
         perror("ERRO - send(ENCERRAR)");
     }
     pthread_cancel(ptid);
-    close(socket_recebe);
+    
     close(socket_envia_servidor);
     close(socket_envia_cliente);
     pthread_mutex_destroy(&mutex);
-    free(contatos);
-    free(grupos);
+    free(listaContatos);
+    free(listaGrupos);
 }
 
 
@@ -460,11 +459,8 @@ void * thread_msg(void *arg){
 
     ptr_thread_arg thread_arg = (ptr_thread_arg)arg;
 
-    int socket_cliente = thread_arg->socket_cliente;
     int socket_server = thread_arg->socket_server;
-    contato *contatos = thread_arg->contatos;
-    grupo *grupos = thread_arg->grupos;
-
+    int socket_recebe = thread_arg->socket_recebe_cliente;
     struct sockaddr_in cliente;
     int socket_accept,namelen;
 
@@ -479,9 +475,10 @@ void * thread_msg(void *arg){
     time_t rawtime;
     struct tm * timeinfo;
 
+   
     do{
         namelen = sizeof(cliente);
-        if((socket_accept = accept(socket_cliente,(struct sockaddr *)&cliente,(socklen_t *)&namelen))== -1){
+        if((socket_accept = accept(socket_recebe,(struct sockaddr *)&cliente,(socklen_t *)&namelen))== -1){
             perror("ERRO - accept(thread)");
             exit(errno);
         }
@@ -553,7 +550,7 @@ void * thread_msg(void *arg){
 
         //se for text exibo um notificacao e a msg na tela
         if(strcmp(msgtype,MSGTEXT)==0){
-            printf("MENSAGEM RECEBIDA\n");
+            printf("\t\tMENSAGEM RECEBIDA - %s\r>",buffer_msg);
             
 
         }
@@ -562,12 +559,14 @@ void * thread_msg(void *arg){
     
     }while(1);
 
+    close(socket_recebe);
+
 }
 
 
-int searchContato(contato **raiz,char *tel){
+int searchContato(contato *lista,char *tel){
 
-    contato *aux = *raiz;
+    contato *aux = lista;
     while(aux != NULL){
         if(strcmp(aux->telefone,tel) == 0){
             return 1;
@@ -578,9 +577,9 @@ int searchContato(contato **raiz,char *tel){
     return 0;
 }
 
-int searchGrupo(grupo **raiz,char *nome){
+int searchGrupo(char *nome){
 
-    grupo *aux = *raiz;
+    grupo *aux = listaGrupos;
     while(aux != NULL){
         if(strcmp(aux->nome,nome) == 0){
             return 1;
@@ -591,13 +590,13 @@ int searchGrupo(grupo **raiz,char *nome){
     return 0;
 }
 
-int remove_contato(contato **raiz,char *tel){
+int remove_contato(char *tel){
 
-    contato *aux = *raiz;
+    contato *aux = listaContatos;
     while(aux != NULL){
         if(strcmp(aux->telefone,tel) == 0){
             if(aux->ant == NULL){
-                *raiz = aux->prox;
+                listaContatos = aux->prox;
                 free(aux);            
             }else{
                 aux->ant->prox = aux->prox;
@@ -611,13 +610,13 @@ int remove_contato(contato **raiz,char *tel){
     return 0;
 }
 
-int remove_grupo(grupo **raiz,char *nome){
+int remove_grupo(char *nome){
 
-    grupo *aux = *raiz;
+    grupo *aux = listaGrupos;
     while(aux != NULL){
         if(strcmp(aux->nome,nome) == 0){
             if(aux->ant == NULL){
-                *raiz = aux->prox;
+                listaGrupos = aux->prox;
                 free(aux);            
             }else{
                 aux->ant->prox = aux->prox;
@@ -631,9 +630,9 @@ int remove_grupo(grupo **raiz,char *nome){
     return 0;
 }
 
-int adiciona_contato(contato **raiz,contato add){
+int adiciona_contato(contato add){
 
-    if(searchContato(raiz,add.telefone) == 1){
+    if(searchContato(listaContatos,add.telefone) == 1){
         return -1;
     }
 
@@ -647,11 +646,11 @@ int adiciona_contato(contato **raiz,contato add){
     strcpy(novo->nome,add.nome);
     novo->prox=NULL;
         
-    if(*raiz == NULL){
-        *raiz = novo;
-        (*raiz)->ant = NULL;
+    if(listaContatos == NULL){
+        listaContatos = novo;
+        listaContatos->ant = NULL;
     }else{
-        contato *aux = *raiz;
+        contato *aux = listaContatos;
         while(aux->prox != NULL){
             aux = aux->prox;
         }
@@ -661,7 +660,7 @@ int adiciona_contato(contato **raiz,contato add){
     return 0;
 }
 
-int adiciona_membro(grupo **raiz,contato add,char *nome){
+int adiciona_membro(contato add,char *nome){
 
     contato *novo = (contato *)malloc(sizeof(contato));
     if(novo == NULL){
@@ -674,15 +673,16 @@ int adiciona_membro(grupo **raiz,contato add,char *nome){
     novo->prox=NULL;
 
 
-    while(*raiz != NULL){
+    grupo *aux = listaGrupos;
+    while(aux != NULL){
 
-        if(strcmp((*raiz)->nome,nome) == 0){
+        if(strcmp(aux->nome,nome) == 0){
 
-            if(searchContato(&(*raiz)->membros,add.telefone) == 1){
+            if(searchContato(aux->membros,add.telefone) == 1){
                 free(novo);
                 return -1;
             }
-            contato *mem = (*raiz)->membros;
+            contato *mem = aux->membros;
 
             if(mem == NULL){
                 mem = novo;
@@ -694,18 +694,18 @@ int adiciona_membro(grupo **raiz,contato add,char *nome){
                 mem->prox = novo;
                 mem->prox->ant=mem;   
             }
-            (*raiz)->qtd+=1;
+            aux->qtd+=1;
             return 0;
         }else{
-            (*raiz) = (*raiz)->prox;
+            aux = aux->prox;
         }
     }
 
 }
 
-void cria_grupo(grupo **raiz,grupo add){
+void cria_grupo(grupo add){
 
-    if(searchGrupo(raiz,add.nome) == 1){
+    if(searchGrupo(add.nome) == 1){
         return;
     }
 
@@ -719,11 +719,11 @@ void cria_grupo(grupo **raiz,grupo add){
     novo->qtd = add.qtd;
     novo->prox=NULL;
         
-    if(*raiz == NULL){
-        *raiz = novo;
-        (*raiz)->ant = NULL;
+    if(listaGrupos == NULL){
+        listaGrupos = novo;
+        listaGrupos->ant = NULL;
     }else{
-        grupo *aux = *raiz;
+        grupo *aux = listaGrupos;
         while(aux->prox != NULL){
             aux = aux->prox;
         }
