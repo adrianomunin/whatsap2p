@@ -172,8 +172,9 @@ int main(int argc, char *argv[])
     printf("Informe seu telefone: ");
     __fpurge(stdin);
     fgets(telefone,sizeof(telefone),stdin);
+   
+    strcpy(buffer_envio,telefone);
 
-    strcat(buffer_envio,telefone);
     strcat(buffer_envio,";");
     sprintf(aux,"%d",porta_recebimento);
     strcat(buffer_envio,aux);
@@ -226,8 +227,9 @@ int main(int argc, char *argv[])
                 contatos = contatos->prox;
             }
             printf("Qual contato?\n");
-            __fpurge(stdin);
+            __fpurge(stdin); 
             scanf("%i",&operacao);
+
             if(operacao>i || operacao > countContatos || operacao<=0){
                 printf("Selecao invalida\n");
                 break;
@@ -242,17 +244,71 @@ int main(int argc, char *argv[])
                 }
                 contatos = contatos->prox;
             }
+
+
+
+
+
+
+            strcat(buffer_envio,GETLOC);
+            strcat(buffer_envio,";");
+            strcat(buffer_envio,telefone);
+            #ifdef DEBUG
+            printf("Comando enviado= %s\n\n",buffer_envio);
+            #endif
+
+            if(send(socket_envia_servidor,buffer_envio,sizeof(buffer_envio),0)<0){
+                perror("ERRO - send2server");
+                exit(errno);
+            }
+
+            if(recv(socket_envia_servidor,buffer_recebimento,sizeof(buffer_recebimento),0)<0){
+                perror("ERRO - recvFromServer");
+                exit(errno);
+            }
+            //tokenizo a resposta da requisicao, msg[0] tera ip/hostname, msg[1] tera porta
+            //se telefone nao encontrado msg[0] = NOTFOUND
+            msg[0]=strtok(buffer_recebimento,";\n");
+            msg[1]=strtok(NULL,";\n");
+            
+            #ifdef DEBUG
+            printf("Comando recebido= %s - %s\n\n",msg[0],msg[1]);
+            #endif
+
+            if(msg[0] == NULL || msg[1] == NULL){
+                printf("ERRO - getloc received NULL\n");
+                break;
+            }
+            if(strcmp(msg[0],NOTFOUND)==0){
+                printf("Telefone nao encontrado!\n");
+                break;
+            }
+
+            contatoPraEnviar.localizacao.sin_addr.s_addr = inet_addr(msg[0]);
+            contatoPraEnviar.localizacao.sin_port = htons(atoi(msg[1]));
+
+
+
+
+
+
+
+
             printf("O que deseja enviar para %s?\n",contatoPraEnviar.nome);
             printf("1 - Foto\n");
             printf("2 - Texto\n");
             printf("0 - Cancelar\n");
+
             __fpurge(stdin);
             scanf("%i",&operacao);
+
             if(operacao == 0)break;
+
             if(connect(socket_envia_cliente,(struct sockaddr *)&contatoPraEnviar.localizacao,sizeof(contatoPraEnviar.localizacao))){
                     perror("ERRO - connect2client");
                     break;
             }
+            
             switch (operacao)
             {
             case 1:
@@ -343,51 +399,19 @@ int main(int argc, char *argv[])
             printf("Digite o telefone\n");
             __fpurge(stdin);
             fgets(telefone,sizeof(telefone),stdin);
+
             if (searchContato(&contatos,telefone)==1){
                 printf("Contato existente!\n");
                 break;
             }
-            //gero a requisicao
-            strcat(buffer_envio,GETLOC);
-            strcat(buffer_envio,";");
-            strcat(buffer_envio,telefone);
-            #ifdef DEBUG
-            printf("Comando enviado= %s\n\n",buffer_envio);
-            #endif
 
-            if(send(socket_envia_servidor,buffer_envio,sizeof(buffer_envio),0)<0){
-                perror("ERRO - send2server");
-                exit(errno);
-            }
-
-            if(recv(socket_envia_servidor,buffer_recebimento,sizeof(buffer_recebimento),0)<0){
-                perror("ERRO - recvFromServer");
-                exit(errno);
-            }
-            //tokenizo a resposta da requisicao, msg[0] tera ip/hostname, msg[1] tera porta
-            //se telefone nao encontrado msg[0] = NOTFOUND
-            msg[0]=strtok(buffer_recebimento,";\n");
-            msg[1]=strtok(NULL,";\n");
-            
-            #ifdef DEBUG
-            printf("Comando recebido= %s - %s\n\n",msg[0],msg[1]);
-            #endif
-
-            if(msg[0] == NULL || msg[1] == NULL){
-                printf("ERRO - getloc received NULL\n");
-                break;
-            }
-            if(strcmp(msg[0],NOTFOUND)==0){
-                printf("Telefone nao encontrado!\n");
-                break;
-            }
             printf("Digite o nome\n");
             __fpurge(stdin);
             scanf("%s",contatoPraAdd.nome);
+
             memcpy(contatoPraAdd.telefone,telefone,sizeof(telefone));
-            contatoPraAdd.localizacao.sin_addr.s_addr = inet_addr(msg[0]);
-            contatoPraAdd.localizacao.sin_port = htons(atoi(msg[1]));
-             if(adiciona_contato(&contatos,contatoPraAdd) == 0){
+
+            if(adiciona_contato(&contatos,contatoPraAdd) == 0){
                  printf("Contato adicionado!\n");
                  countContatos+=1;
              }else{
@@ -613,7 +637,6 @@ int adiciona_contato(contato **raiz,contato add){
 
     strcpy(novo->telefone,add.telefone);
     novo->nome = add.nome;
-    novo->localizacao = add.localizacao;
     novo->prox=NULL;
         
     if(*raiz == NULL){

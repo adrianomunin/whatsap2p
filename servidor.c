@@ -21,11 +21,11 @@
 #define GETTEL "gettel" // requere informacao do servidor, necessario informar telefone
 #define REMOVE "remove" //pede a remocao dos dados do servidor, ocasiona na sua desconexao
 #define NOTFOUND "notfound" //informacao nao encontrada
+
 typedef struct no{
     char telefone[20];
     struct sockaddr_in localizacao;
-    int conectado;
-    struct no *prox; 
+    struct no *prox;
     struct no *ant;
 }usuario;
 
@@ -53,11 +53,13 @@ void adiciona_usuario(usuario add);
 int put_offline(char *tel);
 /*Define o usuario com ´tel´ como online*/
 int put_online(char *tel,struct sockaddr_in);
+
+
 /*printa a lista*/
 void print_lista(){
     usuario *aux = listaDeUsuarios;
     while(aux!=NULL){
-        printf("Telefone: %s\tStatus: %i\n",aux->telefone,aux->conectado);
+        printf("Telefone: %s\n",aux->telefone);
         aux = aux->prox;
     }
 }
@@ -133,6 +135,7 @@ int main(int argc, char *argv[])
             perror("ERRO - Accept()");
             exit(errno);
         }
+
         t_arg.socket = socket_thread;
         t_arg.myName = cliente;
 
@@ -141,6 +144,8 @@ int main(int argc, char *argv[])
             perror("ERRO - thread_create()");
             exit(thread_create_result);
         }
+
+        
 
     }while(1);
     close(socket_conexao);
@@ -162,25 +167,29 @@ void *thread_cliente(void *arg)
     int socket = thread_arg->socket;
     struct sockaddr_in whoami = thread_arg->myName;
     struct sockaddr_in query;
-    usuario queryU; 
+    usuario queryU;
+
     //Recebimento da porta de escuta e telefone
     if(recv(socket,buffer_recebe,sizeof(buffer_recebe),0) == -1){
         perror("ERRO - Recv(porta,telefone");
         exit(errno);
     }
-
+   
     msg[0]=strtok(buffer_recebe,";\n");
     msg[1]=strtok(NULL,";\n");
-    
+
     
     whoami.sin_port = htons(atoi(msg[1]));
     cliente.localizacao = whoami;
     strcpy(cliente.telefone,msg[0]);
-    cliente.conectado=1;
+
+
     //Atualizacao da lista de clientes
     pthread_mutex_trylock(&mutex);
         adiciona_usuario(cliente);
     pthread_mutex_unlock(&mutex);
+
+    print_lista();
 
     printf("cliente id: %s CONECTADO\n",cliente.telefone);   
     do{
@@ -228,26 +237,6 @@ void *thread_cliente(void *arg)
             }
         }
 
-        if(strcmp(msg[0],GETTEL) == 0){
-            //Requisicao de informações de telefone
-            printf("Requisicao GETTEL de cliente id: %s\n",cliente.telefone);
-            
-            
-            query.sin_addr.s_addr = inet_addr(msg[1]);
-            query.sin_port = htons(atoi(msg[2]));
-            pthread_mutex_trylock(&mutex);
-            queryU = getTel(query);
-            pthread_mutex_unlock(&mutex);
-            strcpy(buffer_envia,queryU.telefone);
-            #ifdef DEBUG
-            printf("Comando enviado= %s\n\n",buffer_envia);
-            #endif
-            if(send(socket,buffer_envia,sizeof(buffer_envia),0)<0){
-               fprintf(stderr,"ERRO - Send(): %s, cliente id: %s\n",strerror(errno),cliente.telefone);
-               break;
-            }
-        }
-
         if(strcmp(msg[0],REMOVE) == 0){
             //Requisicao de remocao
             printf("Requisicao REMOVE de cliente id: %s\n",cliente.telefone);    
@@ -260,9 +249,6 @@ void *thread_cliente(void *arg)
         }
     }while(strcmp(msg[0],ENCERRAR) != 0);
 
-    pthread_mutex_trylock(&mutex);
-        put_offline(cliente.telefone);
-    pthread_mutex_unlock(&mutex);
     close(socket);
     printf("cliente id: %s DESCONECTADO\n",cliente.telefone);    
 }
@@ -275,6 +261,7 @@ struct sockaddr_in getLoc(char *telefone){
     usuario *lista = listaDeUsuarios;
 
     while(lista != NULL){
+        printf("Telefone %s\n",lista->telefone);
         if(strcmp(lista->telefone,telefone) == 0){
             return lista->localizacao;
         }    
@@ -282,25 +269,6 @@ struct sockaddr_in getLoc(char *telefone){
     }
     return ret;
 }
-
-usuario getTel(struct sockaddr_in loc){
-
-    usuario ret;
-    usuario *lista = listaDeUsuarios;
-    strcpy(ret.telefone,NOTFOUND);
-    while(lista != NULL){
-        if(lista->localizacao.sin_addr.s_addr = loc.sin_addr.s_addr &&
-                lista->localizacao.sin_port == loc.sin_port){
-                    strcpy(ret.telefone,lista->telefone);
-                    break;
-        }
-        lista=lista->prox;
-    }
-    return ret;
-
-
-}
-
 
 int remove_usuario(char *tel){
 
@@ -323,52 +291,17 @@ int remove_usuario(char *tel){
     return 0;
 }
 
-int put_offline(char *tel){
 
-    usuario *aux = listaDeUsuarios;
-    while(aux != NULL){
-        if(strcmp(aux->telefone,tel) == 0){
-            aux->conectado=0;
-            aux->localizacao.sin_addr.s_addr = INADDR_NONE;
-            aux->localizacao.sin_port = 0;
-            return 1;
-        }else{
-            aux = aux->prox;
-        }
-    }
-}
-    
-/*Define o usuario com ´tel´ como online*/
-int put_online(char *tel,struct sockaddr_in localizacao){
 
-    usuario *aux = listaDeUsuarios;
-    while(aux != NULL){
-        if(strcmp(aux->telefone,tel) == 0){
-            aux->conectado=1;
-            aux->localizacao = localizacao;
-            return 1;
-        }else{
-            aux = aux->prox;
-        }
-    }
-    return 0;
-}
 
 /*Adiciona o usuario no fim da lista, caso usuario ja exista chama ´put_online´*/
 void adiciona_usuario(usuario add){
-
-
-    if(put_online(add.telefone,add.localizacao) == 1){
-        return;
-    }
-
     usuario *novo = (usuario *)malloc(sizeof(usuario));
     if(novo == NULL){
         perror("ERRO - malloc(novo)");
         exit(errno);
     }
     strcpy(novo->telefone,add.telefone);
-    novo->conectado = add.conectado;
     novo->localizacao = add.localizacao;
     novo->prox=NULL;
         
