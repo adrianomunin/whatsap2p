@@ -211,6 +211,8 @@ int main(int argc, char *argv[])
         printf("0 - Sair. \n>");
         __fpurge(stdin);
         scanf("%i", &operacao);
+        __fpurge(stdin);
+        __fpurge(stdout);
         
         switch (operacao)
         {
@@ -311,6 +313,10 @@ int main(int argc, char *argv[])
                     perror("ERRO - connect2client");
                     break;
             }
+            if(send(socket_envia_cliente,telefone,sizeof(telefone),0) < 0){
+                    perror("ERRO - send2client");
+                    break;
+            }
             
             switch (operacao)
             {
@@ -369,7 +375,7 @@ int main(int argc, char *argv[])
                 }
                 printf("Digite a mensagem\n>");
                 __fpurge(stdin);
-                scanf("%s",buffer_envio);
+                fgets(buffer_envio,sizeof(buffer_envio),stdin);
                 
                //envio o tamanho da mensagem
                 sprintf(aux,"%lu",strlen(buffer_envio));
@@ -394,6 +400,7 @@ int main(int argc, char *argv[])
                 break;
             }
 
+            close(socket_envia_cliente);
         }
         break;
 
@@ -406,7 +413,7 @@ int main(int argc, char *argv[])
 
                 printf("Selecione a como adicionar o contato\n");
                 printf("1 - Adiconar de contato existente\n");
-                printf("2 - Adiconar novo contato\n");
+                printf("2 - Adicionar novo contato\n");
                 printf("3 - terminar\n");
                 __fpurge(stdin); 
                 scanf("%i",&operacao);
@@ -431,11 +438,11 @@ int main(int argc, char *argv[])
                         break;
                     }
                     //seleciono o contato requisitado
-            
+                    i = operacao;
                     auxContato = listaContatos;
                     while(auxContato!=NULL){
-                        operacao--;
-                        if(operacao==0){
+                        i--;
+                        if(i==0){
                             printf("SELECIONADO - Nome: %s\tTelefone: %s\n",auxContato->nome,auxContato->telefone);
                             strcpy(contatoPraEnviar.nome,auxContato->nome);
                             strcpy(contatoPraEnviar.telefone,auxContato->telefone);
@@ -475,8 +482,6 @@ int main(int argc, char *argv[])
                 default:
                     printf("Selecao invalida\n");
                     break;
-            
-
                     
                 }
             }while(operacao!=3);           
@@ -518,7 +523,7 @@ int main(int argc, char *argv[])
             printf("Nao entendi o que voce quer!\n");
             break;
         }
-        close(socket_envia_cliente);
+        
     } while (operacao != 0);
 
 
@@ -552,6 +557,7 @@ void * thread_msg(void *arg){
     FILE *fp;
     char path[1000];
     char timestamp[100];
+    char telefone[20];
     char msgtype[80];
     time_t rawtime;
     struct tm * timeinfo;
@@ -570,7 +576,14 @@ void * thread_msg(void *arg){
             exit(errno);
         }
 
-        //Conexao de um cliente aceita, recebendo tipo de msg, foto ou texto
+
+        //Conexao de um cliente aceita, recebo o telefone do remetente
+        if(recv(socket_accept,buffer_comando,sizeof(buffer_comando),0) == -1){
+            perror("ERRO - recv(thread");
+            exit(errno);
+        }
+        strcpy(telefone,buffer_comando);
+        // recebendo tipo de msg, foto ou texto
         if(recv(socket_accept,buffer_comando,sizeof(buffer_comando),0) == -1){
             perror("ERRO - recv(thread");
             exit(errno);
@@ -589,7 +602,7 @@ void * thread_msg(void *arg){
 
             buffer_msg = malloc(size);
             //recebo o corpo da mensagem
-            if(recv(socket_accept,buffer_msg,sizeof(size),0) == -1){
+            if(recv(socket_accept,buffer_msg,size,0) == -1){
                 perror("ERRO - recv(thread");
                 exit(errno);
             }
@@ -600,29 +613,9 @@ void * thread_msg(void *arg){
             strcpy(timestamp,"[");
             strcat(timestamp,asctime(timeinfo));
             strcat(timestamp,"]");
-
-            //pergunto ao servidor telefone de quem enviou
-            strcat(buffer_comando,GETTEL);
-            strcat(buffer_comando,";");
-            strcat(buffer_comando,inet_ntoa(cliente.sin_addr));
-            strcat(buffer_comando,";");
-            sprintf(aux,"%d",ntohs(cliente.sin_port));
-            strcat(buffer_comando,aux);
-            #ifdef DEBUG
-            printf("Comando enviado= %s\n\n",buffer_comando);
-            #endif
-            if(send(socket_server,buffer_comando,sizeof(buffer_comando),0) < 0){
-                perror("ERRO - send(thread)");
-                exit(errno);
-            }
-            if(recv(socket_server,buffer_comando,sizeof(buffer_comando),0) == -1){
-                perror("ERRO - recv(thread)");
-                exit(errno);
-            }
-            #ifdef DEBUG
-            printf("Comando recebido= %s\n\n",buffer_comando);
-            #endif
-            strcat(timestamp,buffer_comando);
+            strcat(timestamp,"[");
+            strcat(timestamp,telefone);
+            strcat(timestamp,"]");
 
             //buffermsg tera o retorno de um fread, verifico se houve erros
             if(strcmp(strerror(atoi(buffer_msg)),"Success") == 0){
@@ -641,11 +634,11 @@ void * thread_msg(void *arg){
             
             buffer_msg = (char *)malloc(size);
             //recebo o corpo da mensagem
-            if(recv(socket_accept,buffer_msg,sizeof(size),0) == -1){
+            if(recv(socket_accept,buffer_msg,size,0) == -1){
                 perror("ERRO - recv(thread");
                 exit(errno);
             }
-            printf("\t\tMENSAGEM RECEBIDA:\n%s\n>",buffer_msg);          
+            printf("\t\tMENSAGEM RECEBIDA DE %s: %s\n",telefone,buffer_msg);          
             __fpurge(stdout);  
         }
 
