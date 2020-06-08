@@ -19,7 +19,6 @@
 #define ENCERRAR "encerrar" // encerra conexao, o que torna offline
 #define GETLOC "getloc" // requere informacao do servidor, necessario informar telefone
 #define GETTEL "gettel" // requere informacao do servidor, necessario informar telefone
-#define REMOVE "remove" //pede a remocao dos dados do servidor, ocasiona na sua desconexao
 #define NOTFOUND "notfound" //informacao nao encontrada
 
 typedef struct no{
@@ -128,7 +127,6 @@ int main(int argc, char *argv[])
     printf("Servidor WhatsAp2p iniciado na porta %i\n\n",ntohs(servidor.sin_port));
     
         do{        
-        printf("\n");
         namelen = sizeof(cliente);
         if ((socket_thread = accept(socket_conexao, (struct sockaddr *)&cliente, (socklen_t *)&namelen)) == -1)
         {
@@ -144,8 +142,6 @@ int main(int argc, char *argv[])
             perror("ERRO - thread_create()");
             exit(thread_create_result);
         }
-
-        
 
     }while(1);
     close(socket_conexao);
@@ -191,9 +187,8 @@ void *thread_cliente(void *arg)
 
     printf("cliente id: %s CONECTADO\n",cliente.telefone);   
     do{
-        msg[2]=msg[1]=msg[0]=NULL;
-        strcpy(buffer_envia,"");
-        strcpy(buffer_recebe,"");
+        *msg=NULL;
+    
         if(recv(socket,buffer_recebe,sizeof(buffer_recebe),0) == -1){
             fprintf(stderr,"ERRO - Recv(): %s, cliente id: %s\n",strerror(errno),cliente.telefone);
             break;
@@ -222,7 +217,7 @@ void *thread_cliente(void *arg)
                 printf("Comando enviado= %s\n\n",NOTFOUND);
                 #endif
             }else{
-                strcat(buffer_envia,inet_ntoa(query.sin_addr));
+                strcpy(buffer_envia,inet_ntoa(query.sin_addr));
                 strcat(buffer_envia,";");
                 sprintf(aux,"%d",ntohs(query.sin_port));
                 strcat(buffer_envia,aux);

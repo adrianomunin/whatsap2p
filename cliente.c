@@ -17,7 +17,6 @@
 //Comandos ao servidor
 #define GETTEL "gettel"
 #define GETLOC "getloc"
-#define REMOVE "remove"
 #define ENCERRAR "encerrar"
 #define NOTFOUND "notfound"
 //Comandos P2P
@@ -119,6 +118,11 @@ int main(int argc, char *argv[])
     int ip_recebimento, porta_recebimento;
     int bindReturn;
     
+    //Setup do socket de envio de mensagens ao cliente
+    if((socket_envia_cliente = socket(PF_INET,SOCK_STREAM,0)) < 0){
+        perror("ERRO - Socket(recv)");
+        exit(errno);
+    }
      //Setup do socket de recebimento de mensagens
     if((socket_recebe_cliente = socket(PF_INET,SOCK_STREAM,0)) < 0){
         perror("ERRO - Socket(recv)");
@@ -177,7 +181,6 @@ int main(int argc, char *argv[])
     fgets(telefone,sizeof(telefone),stdin);
    
     strcpy(buffer_envio,telefone);
-
     strcat(buffer_envio,";");
     sprintf(aux,"%d",porta_recebimento);
     strcat(buffer_envio,aux);
@@ -199,7 +202,8 @@ int main(int argc, char *argv[])
 
     do
     {
-        printf("WhatsAp2p\n");
+        //system("clear");
+        printf("\n\n    WhatsAp2p\n");
         printf("1 - Enviar Mensagem. \n");
         printf("2 - Criar Grupo. \n");
         printf("3 - Adicionar Contato. \n");
@@ -207,9 +211,7 @@ int main(int argc, char *argv[])
         printf("0 - Sair. \n>");
         __fpurge(stdin);
         scanf("%i", &operacao);
-        //system("clear");
-        strcpy(buffer_envio,"");
-        strcpy(buffer_recebimento,"");
+        
         switch (operacao)
         {
         case 1: //Enviar Msg
@@ -240,8 +242,8 @@ int main(int argc, char *argv[])
             
             auxContato = listaContatos;
             while(auxContato!=NULL){
-                i--;
-                if(i==0){
+                operacao--;
+                if(operacao==0){
                     printf("SELECIONADO - Nome: %s\tTelefone: %s\n",auxContato->nome,auxContato->telefone);
                     strcpy(contatoPraEnviar.nome,auxContato->nome);
                     strcpy(contatoPraEnviar.telefone,auxContato->telefone);
@@ -251,7 +253,7 @@ int main(int argc, char *argv[])
                 auxContato = auxContato->prox;
             }
 
-            strcat(buffer_envio,GETLOC);
+            strcpy(buffer_envio,GETLOC);
             strcat(buffer_envio,";");
             strcat(buffer_envio,contatoPraEnviar.telefone);
             #ifdef DEBUG
@@ -281,18 +283,13 @@ int main(int argc, char *argv[])
                 break;
             }
             if(strcmp(msg[0],NOTFOUND)==0){
-                printf("Telefone nao offline ou inexistente!\n");
+                printf("Telefone offline ou inexistente!\n");
                 break;
             }
 
             contatoPraEnviar.localizacao.sin_addr.s_addr = inet_addr(msg[0]);
             contatoPraEnviar.localizacao.sin_port = htons(atoi(msg[1]));
             contatoPraEnviar.localizacao.sin_family = AF_INET;
-
-
-
-
-
 
 
             printf("O que deseja enviar para %s?\n",contatoPraEnviar.nome);
@@ -305,11 +302,7 @@ int main(int argc, char *argv[])
 
             if(operacao == 0)break;
 
-            //Setup do socket de envio de mensagens ao cliente
-            if((socket_envia_cliente = socket(PF_INET,SOCK_STREAM,0)) < 0){
-                perror("ERRO - Socket(recv)");
-                exit(errno);
-            }
+            
             if(connect(socket_envia_cliente,(struct sockaddr *)&contatoPraEnviar.localizacao,sizeof(contatoPraEnviar.localizacao))){
                     perror("ERRO - connect2client");
                     break;
@@ -319,6 +312,10 @@ int main(int argc, char *argv[])
             {
             case 1:
                 printf("Enviar Foto\n\n");
+
+                printf("Digite o nome do arquivo\n>");
+                scanf("%s",aux);
+                
                 //envio o tipo de mensagem
                 if(send(socket_envia_cliente,MSGPHOTO,sizeof(MSGPHOTO),0) < 0){
                         perror("ERRO - send2client");
@@ -368,20 +365,21 @@ int main(int argc, char *argv[])
                 }
                 printf("Digite a mensagem\n>");
                 __fpurge(stdin);
-                fgets(buffer_envio,sizeof(buffer_envio),stdin);
+                scanf("%s",buffer_envio);
                 
                 //envio o tamanho da mensagem
-                sprintf(aux,"%lu",sizeof(buffer_envio));
+                sprintf(aux,"%lu",strlen(buffer_envio));
                 if(send(socket_envia_cliente,aux,sizeof(aux),0)<0){
                     perror("ERRO - send2client");
                     break;
                 }
                 //depois a mensagem em si
-                if(send(socket_envia_cliente,buffer_envio,sizeof(buffer_envio),0)<0){
+                
+                if((ret=send(socket_envia_cliente,buffer_envio,strlen(buffer_envio),0))<0){
                     perror("ERRO - send2client");
                     break;
                 }
-                printf("Mensagem enviada!\n");
+                printf("Mensagem enviada! %i bytes\n",ret);
                 break;
             
             case 0:
@@ -393,7 +391,6 @@ int main(int argc, char *argv[])
             }
 
         }
-        close(socket_envia_cliente);
         break;
 
         case 2: //Criar Grupo
@@ -405,8 +402,8 @@ int main(int argc, char *argv[])
         {
             printf("Digite o telefone\n");
             __fpurge(stdin);
-            fgets(telefone,sizeof(telefone),stdin);
-
+            scanf("%s",contatoPraAdd.telefone);
+            
             if (searchContato(listaContatos,telefone)==1){
                 printf("Contato existente!\n");
                 break;
@@ -414,9 +411,7 @@ int main(int argc, char *argv[])
 
             printf("Digite o nome\n");
             __fpurge(stdin);
-            fgets(contatoPraAdd.nome,sizeof(contatoPraAdd.nome),stdin);
-
-            memcpy(contatoPraAdd.telefone,telefone,sizeof(telefone));
+            scanf("%s",contatoPraAdd.nome);
 
             if(adiciona_contato(contatoPraAdd) == 0){
                  printf("Contato adicionado!\n");
@@ -449,6 +444,7 @@ int main(int argc, char *argv[])
     
     close(socket_envia_servidor);
     close(socket_envia_cliente);
+    close(socket_recebe_cliente);
     pthread_mutex_destroy(&mutex);
     free(listaContatos);
     free(listaGrupos);
@@ -477,6 +473,12 @@ void * thread_msg(void *arg){
 
    
     do{
+        buffer_msg=NULL;
+        strcpy(buffer_comando,"");
+        strcpy(path,"");
+        strcpy(msgtype,"");
+        strcpy(timestamp,"");
+
         namelen = sizeof(cliente);
         if((socket_accept = accept(socket_recebe,(struct sockaddr *)&cliente,(socklen_t *)&namelen))== -1){
             perror("ERRO - accept(thread)");
@@ -496,20 +498,24 @@ void * thread_msg(void *arg){
             exit(errno);
         }
         size = atol(buffer_comando);
-        buffer_msg = malloc(size);
-
-        //recebo o corpo da mensagem
-        if(recv(socket_accept,buffer_msg,sizeof(size),0) == -1){
-            perror("ERRO - recv(thread");
-            exit(errno);
-        }
+    
+        
+        
 
         //se for arquivo escrevo no disco
         if(strcmp(msgtype,MSGPHOTO) == 0){
+
+            buffer_msg = malloc(size);
+            //recebo o corpo da mensagem
+            if(recv(socket_accept,buffer_msg,sizeof(size),0) == -1){
+                perror("ERRO - recv(thread");
+                exit(errno);
+            }
+
             //gero a timestamp = [info de data/hora]telefone
             time(&rawtime);
             timeinfo = localtime(&rawtime);
-            strcat(timestamp,"[");
+            strcpy(timestamp,"[");
             strcat(timestamp,asctime(timeinfo));
             strcat(timestamp,"]");
 
@@ -550,16 +556,22 @@ void * thread_msg(void *arg){
 
         //se for text exibo um notificacao e a msg na tela
         if(strcmp(msgtype,MSGTEXT)==0){
-            printf("\t\tMENSAGEM RECEBIDA - %s\r>",buffer_msg);
+            
+            buffer_msg = (char *)malloc(size);
+            //recebo o corpo da mensagem
+            if(recv(socket_accept,buffer_msg,sizeof(size),0) == -1){
+                perror("ERRO - recv(thread");
+                exit(errno);
+            }
+            printf("\t\tMENSAGEM RECEBIDA - %s",buffer_msg);
             
 
         }
 
+        close(socket_accept);
         free(buffer_msg);
     
     }while(1);
-
-    close(socket_recebe);
 
 }
 
