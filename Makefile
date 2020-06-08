@@ -1,5 +1,5 @@
 all: 
-	gcc cliente.c -o cliente -g 
+	gcc cliente.c -o cliente -g -pthread 
 	gcc servidor.c -o servidor -g -pthread
 
 cliente: cliente.c
