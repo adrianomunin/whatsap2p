@@ -13,16 +13,22 @@
 #include <time.h>
 #include <pthread.h> 
 
-#define DEBUG 1
+/*Flag de depuracao, comente a linha para desativa*/
+//#define DEBUG 1
+
+/*Tamanho dos buffers utilizados pelo programa*/
 #define TAM_BUFFER 250
-//comandos
+
+//Requests aceitos
 #define ENCERRAR "encerrar" // encerra conexao, o que torna offline
 #define GETLOC "getloc" // requere informacao do servidor, necessario informar telefone
 #define GETTEL "gettel" // requere informacao do servidor, necessario informar telefone
+//Respostas
 #define NOTFOUND "notfound" //informacao nao encontrada
 #define OK "ok" // tudo ok
 #define NOTCONNECTED "notconnected" // nao posso te conectar, voce ja existe
 
+/*Struct de usuario, define um no da lista de usuarios*/
 typedef struct no{
     char telefone[20];
     struct sockaddr_in localizacao;
@@ -31,30 +37,30 @@ typedef struct no{
     struct no *ant;
 }usuario;
 
-//mutex
+//Mutex
 pthread_mutex_t mutex;
 
-//thread_args
+//Struct de argumentos da thread
 typedef struct{
     int socket;
     struct sockaddr_in myName;
 
 }thread_arg,*ptr_thread_arg;
 
-//thread_func
+//Funcao da thread de tratamento de requests de clientes
 void *thread_cliente(void*);
 
-//lista de usuarios
+//A lista de usuarios logados no servidor
 usuario *listaDeUsuarios;
 
 /*Remove usuario da lista, retorna 1 se sucesso*/
 int remove_usuario(char *tel);
-/*Adiciona o usuario no fim da lista, caso usuario ja exista chama ´put_online´*/
+/*Adiciona o usuario no fim da lista*/
 void adiciona_usuario(usuario add);
 /*Procura usuario na lista, 1 se encontrado 0 se nao*/
 int searchUsuario(usuario u);
 
-/*printa a lista*/
+/*Exibe a lista no terminal do servidor, usado para depuração*/
 void print_lista(){
     usuario *aux = listaDeUsuarios;
     while(aux!=NULL){
@@ -63,6 +69,7 @@ void print_lista(){
     }
 }
 
+/*Dado um telefone retorna as informaçoes de localização do usuario em questao*/
 struct sockaddr_in getLoc(char *telefone);
 
 int main(int argc, char *argv[])
@@ -253,7 +260,6 @@ void *thread_cliente(void *arg)
     printf("cliente id: %s DESCONECTADO\n",cliente.telefone);    
 }
 
-
 struct sockaddr_in getLoc(char *telefone){
     
     struct sockaddr_in ret;
@@ -290,7 +296,6 @@ int remove_usuario(char *tel){
     return 0;
 }
 
-
 int searchUsuario(usuario u){
 
     usuario *aux = listaDeUsuarios;
@@ -303,8 +308,6 @@ int searchUsuario(usuario u){
     return 0;
 }
 
-
-/*Adiciona o usuario no fim da lista, caso usuario ja exista chama ´put_online´*/
 void adiciona_usuario(usuario add){
     
     usuario *novo = (usuario *)malloc(sizeof(usuario));

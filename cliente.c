@@ -26,7 +26,7 @@
 #define MSGTEXT "msgtext"
 
 /*Flag de DEBUG, comente essa linha para desativar as mensagens de depuração*/
-#define DEBUG 1
+//#define DEBUG 1
 
 /*Tamanho dos buffers utilizados pelo programa*/
 #define TAM_BUFFER 250
@@ -283,7 +283,6 @@ int main(int argc, char *argv[])
 
     do
     {
-        
         printf("\n\n    WhatsAp2p\n");
         printf("1 - Enviar Mensagem. \n");
         printf("2 - Enviar Foto. \n");
@@ -293,6 +292,8 @@ int main(int argc, char *argv[])
         printf("6 - Listar Grupo. \n");        
         printf("7 - Listar Mensagens. %i nao lidas\n",naoLida);
         printf("8 - Creditos.\n");
+        printf("9 - Excluir contato.\n");
+        printf("10 - Excluir grupo.\n");
         printf("0 - Sair. \n>");
         __fpurge(stdin);
         scanf("%i", &operacao_principal);
@@ -308,9 +309,8 @@ int main(int argc, char *argv[])
             //A mensagem em si
 
             printf("Enviar Mensagem Para:\n");
-            printf("1 - Numero\n");
-            printf("2 - Contato\n");
-            printf("3 - Grupo\n");
+            printf("1 - Contato\n");
+            printf("2 - Grupo\n");
             printf("0 - Cancelar\n>");
 
             __fpurge(stdin);
@@ -319,10 +319,8 @@ int main(int argc, char *argv[])
             switch (operacao)
                 {
                 case 1:
-                    break;
-                case 2:
                 if (tem_alguem(CONTATO) == 0){
-                    printf("Não há contato cadastrado!\n");
+                    printf("Não há contatos cadastrados!\n");
                     break;
                 }
                     selecionar_contato(&contatoPraEnviar, countContatos);
@@ -336,9 +334,9 @@ int main(int argc, char *argv[])
                     enviar_texto(socket_envia_cliente, buffer_envio);
                     close(socket_envia_cliente);                        
                     break;
-                case 3:
+                case 2:
                  if (tem_alguem(GRUPO) == 0){
-                    printf("Não há grupo cadastrado!\n");
+                    printf("Não há grupos cadastrados!\n");
                     break;
                 }
                 selecionar_grupo(&grupoPraEnviar);
@@ -372,9 +370,8 @@ int main(int argc, char *argv[])
 
         case 2: //Enviar foto
             printf("Enviar Foto Para:\n");
-            printf("1 - Numero\n");
-            printf("2 - Contato\n");
-            printf("3 - Grupo\n");
+            printf("1 - Contato\n");
+            printf("2 - Grupo\n");
             printf("0 - Cancelar\n>");
 
             __fpurge(stdin);
@@ -383,10 +380,8 @@ int main(int argc, char *argv[])
             switch (operacao)
             {
             case 1:
-                break;
-            case 2:
             if (tem_alguem(CONTATO) == 0){
-                    printf("Não há contato cadastrado!\n");
+                    printf("Não há contatos cadastrados!\n");
                     break;
             }
                 selecionar_contato(&contatoPraEnviar, countContatos);
@@ -397,11 +392,15 @@ int main(int argc, char *argv[])
                     printf("Digite o nome do arquivo\n>");
                     __fpurge(stdin);
                     scanf("%s", buffer_envio);
-                    
+                    close(socket_envia_cliente);
                     enviar_foto(socket_envia_cliente, buffer_envio);
                 break;
-            case 3:
-            selecionar_grupo(&grupoPraEnviar);
+            case 2:
+                    if (tem_alguem(GRUPO) == 0){
+                        printf("Não há grupos cadastrados!\n");
+                        break;
+                    }
+                    selecionar_grupo(&grupoPraEnviar);
                     printf("A Foto sera enviada para o grupo %s\n", grupoPraEnviar.nome);
                     print_grupo(grupoPraEnviar.nome);
                     
@@ -412,13 +411,10 @@ int main(int argc, char *argv[])
                     __fpurge(stdin);
                     scanf("%s", buffer_envio);
 
-                    __fpurge(stdin);
-                    fgets(buffer_envio, sizeof(buffer_envio), stdin);
-
                     while(auxContato != NULL){
                         get_localizacao(auxContato, socket_envia_servidor);
                         socket_envia_cliente = conecta_cliente(auxContato, telefone);
-                        usleep(1000);
+                        usleep(1000);   
                         enviar_foto(socket_envia_cliente,buffer_envio);
                         close(socket_envia_cliente);
                         auxContato = auxContato->prox;
@@ -427,11 +423,11 @@ int main(int argc, char *argv[])
 
             case 0:
                 break;
+                
             default:
                 printf("Nao entendi o que voce quer!\n");
                 break;
             }
-            close(socket_envia_cliente);
             break;
 
         case 3: //Adc Contato
@@ -439,7 +435,7 @@ int main(int argc, char *argv[])
             __fpurge(stdin);
             scanf("%s", contatoPraAdd.telefone);
 
-            if (searchContato(listaContatos, telefone) == 1)
+            if (searchContato(listaContatos, contatoPraAdd.telefone) == 1)
             {
                 printf("Contato existente!\n");
                 break;
@@ -462,11 +458,12 @@ int main(int argc, char *argv[])
 
         case 4: //Listar contatos
         if (tem_alguem(CONTATO) == 0){
-                printf("Não há contato cadastrado!\n");
+                printf("Não há contatos cadastrados!\n");
                 break;
             }
             printf("-----Contatos Cadastrados-----\n");
-            countContatos = listar_contatos();
+            countContatos = contar_contatos();
+            listar_contatos();
             printf("     Total de contatos: %i \n", countContatos);
             break;
 
@@ -492,8 +489,8 @@ int main(int argc, char *argv[])
                     int orden_contato;
                 case 1:
                     //Printo todos os contatos
-                    countContatos = listar_contatos();
-
+                    countContatos = contar_contatos();
+                    listar_contatos();
                     printf("Qual contato?\n");
                     __fpurge(stdin);
                     scanf("%i", &orden_contato);
@@ -526,6 +523,7 @@ int main(int argc, char *argv[])
 
                 case 0:
                     break;
+                
                 default:
                     printf("Nao entendi o que voce quer!\n");
                     break;
@@ -536,7 +534,7 @@ int main(int argc, char *argv[])
 
         case 6: //Listar Grupos
         if (tem_alguem(GRUPO) == 0){
-                printf("Não há grupo cadastrado!\n");
+                printf("Não há grupos cadastrados!\n");
                 break;
             }
             listar_grupos();
@@ -551,12 +549,46 @@ int main(int argc, char *argv[])
         break;
 
         case 8://Creditos
-        {
+        
             printf("Feito com sangue e suor por: \nAdriano Munin - @adrianomunin\nFabio Irokawa - @fabioirokawa\nIago Lourenco - @iaglourenco\nLucas Coutinho - @lucasrcoutinho\n");
             printf("Mais informacoes em: https://github.com/adrianomunin/whatsap2p\n\n");
-        }
+            break;
 
+        case 9://Excluir contato
+            if (tem_alguem(CONTATO) == 0){
+                printf("Não há contatos cadastrados!\n");
+                break;
+            }
+            printf("Digite o telefone do contato\n>");
+            scanf("%s",contatoPraAdd.telefone);
+            if(searchContato(listaContatos,contatoPraAdd.telefone) == 1){
+                if( remove_contato(contatoPraAdd.telefone) == 1){
+                    printf("Contato removido!\n");
+                }
+            }else
+                printf("Contato nao encontrado!\n");
+            
+            break;
+        
+        case 10://Excluir grupo
+            if (tem_alguem(GRUPO) == 0){
+                printf("Não há grupos cadastrados!\n");
+                break;
+            }
+            printf("Digite o nome do grupo\n>");
+            scanf("%s",grupoPraAdd.nome);
+            if(searchGrupo(grupoPraAdd.nome) == 1){
+                if(remove_grupo(grupoPraAdd.nome) == 1){
+                    printf("Grupo removido!\n");
+                }
+            }else
+                printf("Grupo nao encontrado\n");
+            break;
         case 0:
+            break;
+        
+        case 99:
+            printf("Informacoes Atualizadas!\n\n");
             break;
         default:
             printf("Nao entendi o que voce quer!\n");
@@ -868,7 +900,6 @@ int adiciona_membro(contato add, char *nome)
                 while (mem->prox != NULL)
                 {
                     mem = mem->prox;
-                    __fpurge(stdout);
                 }
                 mem->prox = novo;
                 mem->prox->ant = mem;
@@ -1401,7 +1432,9 @@ int contar_grupos()
     grupo *aux = listaGrupos;
     while(aux != NULL){
         i++;
+        aux=aux->prox;
     }
+    return i;
 }
 
 int contar_contatos(){
