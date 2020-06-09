@@ -19,6 +19,8 @@
 #define GETLOC "getloc"
 #define ENCERRAR "encerrar"
 #define NOTFOUND "notfound"
+#define NOTCONNECTED "notconnected"
+#define OK "ok"
 //Comandos P2P
 #define MSGPHOTO "msgphoto"
 #define MSGTEXT "msgtext"
@@ -227,13 +229,32 @@ int main(int argc, char *argv[])
     strcat(buffer_envio, ";");
     sprintf(aux, "%d", porta_recebimento);
     strcat(buffer_envio, aux);
+
+    #ifdef DEBUG
+    printf("Comando enviado: %s\n\n",buffer_envio);
+    #endif
     if (send(socket_envia_servidor, buffer_envio, sizeof(buffer_envio), 0) < 0)
     {
         perror("ERRO - send(servidor)");
         exit(errno);
     }
-    //Conectado ao servidor, lancando thread de mensagens
+    if(recv(socket_envia_servidor,buffer_recebimento,sizeof(buffer_recebimento),0) == -1){
+        perror("ERRO - recv(servidor confirmation)");
+        exit(errno);
+    }
+    
+    #ifdef DEBUG
+    printf("Comando recebido: %s\n\n",buffer_recebimento);
+    #endif    
 
+    //Falha no registro do servidor
+    if(strcmp(buffer_recebimento,NOTCONNECTED)==0){
+        errno=98;
+        perror("ERRO - connect()");
+        exit(errno);
+    }
+
+    //Conectado ao servidor, lancando thread de mensagens
     t_arg.socket_server = socket_envia_servidor;
     t_arg.socket_recebe_cliente = socket_recebe_cliente;
     t_arg.server = server;
