@@ -930,8 +930,8 @@ int escrever_arq(char telefone[])
     contato struct_arquivada;
 
     FILE *arq;
-    char nome_arquivo[50] = "";
-    strcat(nome_arquivo, telefone);
+    char nome_arquivo[50];
+    strcpy(nome_arquivo, telefone);
     strcat(nome_arquivo, ".dat");
 
     //abrindo ou criando arquivo que possui como nome o telefone do dono
@@ -966,8 +966,8 @@ int ler_arq(char telefone[], int countContatos)
     contato struct_arquivada;
 
     FILE *arq;
-    char nome_arquivo[50] = "";
-    strcat(nome_arquivo, telefone);
+    char nome_arquivo[50];
+    strcpy(nome_arquivo, telefone);
     strcat(nome_arquivo, ".dat");
 
     ////abrindo arquivo que possui como nome o telefone do dono
