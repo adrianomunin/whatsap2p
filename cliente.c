@@ -113,7 +113,7 @@ void print_msgs();
 /*Coloca por referencia o contato selecionado*/
 void selecionar_contato(contato *contatoPraEnviar, int countContatos);
 /*Coloca por referencia a localizacao do contato selecionado*/
-void get_localizacao(contato *contatoPraEnviar, int socket_envia_servidor);
+int get_localizacao(contato *contatoPraEnviar, int socket_envia_servidor);
 /*Envia a foto ao cliente*/
 void enviar_foto(int socket_envia_cliente,char *nome_arquivo);
 /*Envia o texto ao cliente*/
@@ -324,7 +324,10 @@ int main(int argc, char *argv[])
                     break;
                 }
                     selecionar_contato(&contatoPraEnviar, countContatos);
-                    get_localizacao(&contatoPraEnviar, socket_envia_servidor);
+                    if(get_localizacao(&contatoPraEnviar, socket_envia_servidor) == -1){
+                        printf("ERRO - Contato offline\n");
+                        break;
+                    }
                     socket_envia_cliente = conecta_cliente(&contatoPraEnviar, telefone);
                     
                      printf("Digite a mensagem\n>");
@@ -350,7 +353,10 @@ int main(int argc, char *argv[])
                     fgets(buffer_envio, sizeof(buffer_envio), stdin);
 
                     while(auxContato != NULL){
-                        get_localizacao(auxContato, socket_envia_servidor);
+                        if(get_localizacao(auxContato, socket_envia_servidor) == -1){
+                            printf("ERRO - Contato offline\n");
+                            break;
+                        }
                         socket_envia_cliente = conecta_cliente(auxContato, telefone);
                         usleep(100);
                         enviar_texto(socket_envia_cliente, buffer_envio);
@@ -385,15 +391,18 @@ int main(int argc, char *argv[])
                     break;
             }
                 selecionar_contato(&contatoPraEnviar, countContatos);
-                get_localizacao(&contatoPraEnviar, socket_envia_servidor);
+                if(get_localizacao(&contatoPraEnviar, socket_envia_servidor) == -1){
+                    printf("ERRO - Contato offline\n");
+                    break;
+                }
                 socket_envia_cliente = conecta_cliente(&contatoPraEnviar, telefone);
                 
                 printf("Enviar Foto\n\n");
                     printf("Digite o nome do arquivo\n>");
                     __fpurge(stdin);
                     scanf("%s", buffer_envio);
-                    close(socket_envia_cliente);
                     enviar_foto(socket_envia_cliente, buffer_envio);
+                    close(socket_envia_cliente);
                 break;
             case 2:
                     if (tem_alguem(GRUPO) == 0){
@@ -412,7 +421,10 @@ int main(int argc, char *argv[])
                     scanf("%s", buffer_envio);
 
                     while(auxContato != NULL){
-                        get_localizacao(auxContato, socket_envia_servidor);
+                        if(get_localizacao(auxContato, socket_envia_servidor)==-1){
+                            printf("ERRO - Contato offline\n");
+                            break;
+                        }
                         socket_envia_cliente = conecta_cliente(auxContato, telefone);
                         usleep(1000);   
                         enviar_foto(socket_envia_cliente,buffer_envio);
@@ -464,7 +476,7 @@ int main(int argc, char *argv[])
             printf("-----Contatos Cadastrados-----\n");
             countContatos = contar_contatos();
             listar_contatos();
-            printf("     Total de contatos: %i \n", countContatos);
+            printf("\n     Total de contatos: %i \n", countContatos);
             break;
 
         case 5: //Criar Grupo
@@ -491,7 +503,7 @@ int main(int argc, char *argv[])
                     //Printo todos os contatos
                     countContatos = contar_contatos();
                     listar_contatos();
-                    printf("Qual contato?\n");
+                    printf("\nEscolha o contato:\n>");
                     __fpurge(stdin);
                     scanf("%i", &orden_contato);
 
@@ -1125,7 +1137,7 @@ int ler_arq_grupo(char telefone[], int countGrupos)
             perror("ERRO - fopen - criacao");
             exit(errno);
         }
-        }   
+    }   
 
     while (fread(&struct_grupo, sizeof(struct_grupo), 1, arq))
     {
@@ -1155,7 +1167,7 @@ int ler_arq_grupo(char telefone[], int countGrupos)
 
 int adiciona_msg(mensagem msg){
 
-    mensagem *novo = (mensagem *)malloc(sizeof(contato));
+    mensagem *novo = (mensagem *)malloc(sizeof(mensagem));
     if (novo == NULL)
     {
         perror("ERRO - malloc(novo)");
@@ -1165,6 +1177,7 @@ int adiciona_msg(mensagem msg){
     strcpy(novo->msg,msg.msg);
     novo->remetente = msg.remetente;
     novo->timeinfo = msg.timeinfo;
+    novo->prox=NULL;
     
     if (listaMensagens == NULL)
     {
@@ -1231,7 +1244,7 @@ void selecionar_contato(contato *contatoPraEnviar, int countContatos){
                 printf("#%i - Nome: %s\tTelefone: %s\n", i, auxContato->nome, auxContato->telefone);
                 auxContato = auxContato->prox;
             }
-            printf("Qual contato?\n");
+            printf("\nEscolha o contato:\n>");
             __fpurge(stdin);
             scanf("%i", &operacao);
             if (operacao > i || operacao > countContatos || operacao <= 0)
@@ -1255,7 +1268,7 @@ void selecionar_contato(contato *contatoPraEnviar, int countContatos){
             }
 }
 
-void get_localizacao(contato *contatoPraEnviar, int socket_envia_servidor){
+int get_localizacao(contato *contatoPraEnviar, int socket_envia_servidor){
             char buffer_envio[TAM_BUFFER];
             char buffer_recebimento[TAM_BUFFER];
             char *msg[TAM_BUFFER];
@@ -1287,22 +1300,21 @@ void get_localizacao(contato *contatoPraEnviar, int socket_envia_servidor){
     printf("Comando recebido= %s - %s\n\n", msg[0], msg[1]);
 #endif
 
+    if (strcmp(msg[0], NOTFOUND) == 0)
+    {
+        return -1;
+    }
     if (msg[0] == NULL || msg[1] == NULL)
     {
         printf("ERRO - getloc received NULL\n");
         //break;
-        return;
+        return -1;
     }
-    if (strcmp(msg[0], NOTFOUND) == 0)
-    {
-        printf("Telefone offline ou inexistente!\n");
-        //break;
-        return;
-    }
-
+    
     contatoPraEnviar->localizacao.sin_addr.s_addr = inet_addr(msg[0]);
     contatoPraEnviar->localizacao.sin_port = htons(atoi(msg[1]));
     contatoPraEnviar->localizacao.sin_family = AF_INET;
+    return 0;
 }
 
 void enviar_texto(int socket_envia_cliente, char *buffer_envio){
@@ -1460,7 +1472,7 @@ void selecionar_grupo(grupo *grupoPraEnviar){
         auxGrupo = auxGrupo->prox;
     }
 
-    printf("Qual Grupo?\n");
+    printf("\nEscolha o grupo:\n>");
     __fpurge(stdin);
     scanf("%i", &operacao);
     if (operacao > i || operacao <= 0)
