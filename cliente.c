@@ -19,6 +19,8 @@
 #define GETLOC "getloc"
 #define ENCERRAR "encerrar"
 #define NOTFOUND "notfound"
+#define NOTCONNECTED "notconnected"
+#define OK "ok"
 //Comandos P2P
 #define MSGPHOTO "msgphoto"
 #define MSGTEXT "msgtext"
@@ -227,13 +229,32 @@ int main(int argc, char *argv[])
     strcat(buffer_envio, ";");
     sprintf(aux, "%d", porta_recebimento);
     strcat(buffer_envio, aux);
+
+    #ifdef DEBUG
+    printf("Comando enviado: %s\n\n",buffer_envio);
+    #endif
     if (send(socket_envia_servidor, buffer_envio, sizeof(buffer_envio), 0) < 0)
     {
         perror("ERRO - send(servidor)");
         exit(errno);
     }
-    //Conectado ao servidor, lancando thread de mensagens
+    if(recv(socket_envia_servidor,buffer_recebimento,sizeof(buffer_recebimento),0) == -1){
+        perror("ERRO - recv(servidor confirmation)");
+        exit(errno);
+    }
+    
+    #ifdef DEBUG
+    printf("Comando recebido: %s\n\n",buffer_recebimento);
+    #endif    
 
+    //Falha no registro do servidor
+    if(strcmp(buffer_recebimento,NOTCONNECTED)==0){
+        errno=98;
+        perror("ERRO - connect()");
+        exit(errno);
+    }
+
+    //Conectado ao servidor, lancando thread de mensagens
     t_arg.socket_server = socket_envia_servidor;
     t_arg.socket_recebe_cliente = socket_recebe_cliente;
     t_arg.server = server;
@@ -295,11 +316,12 @@ int main(int argc, char *argv[])
                     __fpurge(stdin);
                     fgets(buffer_envio, sizeof(buffer_envio), stdin);
 
-                    enviar_texto(socket_envia_cliente, buffer_envio);                        
+                    enviar_texto(socket_envia_cliente, buffer_envio);
+                    close(socket_envia_cliente);                        
                     break;
                 case 3:
                 selecionar_grupo(&grupoPraEnviar);
-                    printf("Mesagem sera enviada para o grupo %s\n", grupoPraEnviar.nome);
+                    printf("Mensagem sera enviada para o grupo %s\n", grupoPraEnviar.nome);
                     print_grupo(grupoPraEnviar.nome);
                     
                     auxContato = grupoPraEnviar.membros;
@@ -312,6 +334,7 @@ int main(int argc, char *argv[])
                         get_localizacao(auxContato, socket_envia_servidor);
                         socket_envia_cliente = conecta_cliente(auxContato, telefone);
                         enviar_texto(socket_envia_cliente, buffer_envio);
+                        close(socket_envia_cliente);
                         auxContato = auxContato->prox;
                     }  
                     break;                
@@ -322,7 +345,7 @@ int main(int argc, char *argv[])
                 printf("Nao entendi o que voce quer!\n");
                 break;
             }
-            close(socket_envia_cliente);
+            
             break;
 
         case 2: //Enviar foto
