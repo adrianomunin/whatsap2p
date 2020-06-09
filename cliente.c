@@ -263,12 +263,11 @@ int main(int argc, char *argv[])
         printf("0 - Sair. \n>");
         __fpurge(stdin);
         scanf("%i", &operacao_principal);
-        
 
         switch (operacao_principal)
         {
         case 1: //Enviar Msg
-        
+
             //Ordem de envio:
             //Tipo da mensagem - MSGTEXT ou MSGPHOTO
             //Tamanho da mensagem
@@ -317,16 +316,16 @@ int main(int argc, char *argv[])
                     }  
                     break;                
 
-                case 0:
-                    break;
-                default:
-                    printf("Nao entendi o que voce quer!\n");
-                    break;
-                }
-            close(socket_envia_cliente);        
-        break;
+            case 0:
+                break;
+            default:
+                printf("Nao entendi o que voce quer!\n");
+                break;
+            }
+            close(socket_envia_cliente);
+            break;
 
-        case 2: //Enviar foto                    
+        case 2: //Enviar foto
             printf("Enviar Foto Para:\n");
             printf("1 - Numero\n");
             printf("2 - Contato\n");
@@ -338,27 +337,27 @@ int main(int argc, char *argv[])
 
             switch (operacao)
             {
-                case 1:
-                    break;
-                case 2:
-                    selecionar_contato(&contatoPraEnviar, countContatos);
-                    get_localizacao(&contatoPraEnviar, socket_envia_servidor);
-                    socket_envia_cliente = conecta_cliente(&contatoPraEnviar, telefone);
-                    enviar_foto(socket_envia_cliente);                       
-                    break;
-                case 3:
-                    break;                
+            case 1:
+                break;
+            case 2:
+                selecionar_contato(&contatoPraEnviar, countContatos);
+                get_localizacao(&contatoPraEnviar, socket_envia_servidor);
+                socket_envia_cliente = conecta_cliente(&contatoPraEnviar, telefone);
+                enviar_foto(socket_envia_cliente);
+                break;
+            case 3:
+                break;
 
-                case 0:
-                    break;
-                default:
-                    printf("Nao entendi o que voce quer!\n");
-                    break;
+            case 0:
+                break;
+            default:
+                printf("Nao entendi o que voce quer!\n");
+                break;
             }
             close(socket_envia_cliente);
-        break;
+            break;
 
-        case 3: //Adc Contato        
+        case 3: //Adc Contato
             printf("Digite o telefone\n");
             __fpurge(stdin);
             scanf("%s", contatoPraAdd.telefone);
@@ -382,77 +381,80 @@ int main(int argc, char *argv[])
             {
                 printf("Contato ja existente!");
             }
-        break;
+            break;
 
-        case 4: //Listar contatos       
+        case 4: //Listar contatos
             printf("-----Contatos Cadastrados-----\n");
             countContatos = listar_contatos();
             printf("     Total de contatos: %i \n", countContatos);
-        break;
+            break;
 
-        case 5: //Criar Grupo          
+        case 5: //Criar Grupo
             printf("Digite o Nome do Grupo\n");
-            
+
             __fpurge(stdin);
-            scanf("%s", grupoPraAdd.nome);     
+            scanf("%s", grupoPraAdd.nome);
             cria_grupo(grupoPraAdd);
-            
-            
-            do{
+
+            do
+            {
                 print_grupo(grupoPraAdd.nome);
                 printf("Selecione a opcao desejada\n");
                 printf("1 - Adicionar contato ao grupo\n");
                 printf("0 - Concluir\n");
 
-                __fpurge(stdin); 
-                scanf("%i",&operacao);
+                __fpurge(stdin);
+                scanf("%i", &operacao);
 
                 switch (operacao)
-                {   
+                {
                     int orden_contato;
-                    case 1:
-                        //Printo todos os contatos
-                        countContatos = listar_contatos();
+                case 1:
+                    //Printo todos os contatos
+                    countContatos = listar_contatos();
 
-                        printf("Qual contato?\n");
-                        __fpurge(stdin); 
-                        scanf("%i",&orden_contato);
+                    printf("Qual contato?\n");
+                    __fpurge(stdin);
+                    scanf("%i", &orden_contato);
 
-                        if(/*operacao>i || */orden_contato > countContatos || orden_contato<=0){
-                            printf("Selecao invalida\n");
+                    if (/*operacao>i || */ orden_contato > countContatos || orden_contato <= 0)
+                    {
+                        printf("Selecao invalida\n");
+                        break;
+                    }
+
+                    //seleciono o contato requisitado
+
+                    auxContato = listaContatos;
+                    while (auxContato != NULL)
+                    {
+                        orden_contato--;
+                        if (orden_contato == 0)
+                        {
+                            printf("SELECIONADO - Nome: %s\tTelefone: %s\n", auxContato->nome, auxContato->telefone);
+                            strcpy(contatoPraAdd.nome, auxContato->nome);
+                            strcpy(contatoPraAdd.telefone, auxContato->telefone);
+
+                            if (adiciona_membro(contatoPraAdd, grupoPraAdd.nome) == 1)
+                                printf("\n   *Contato ja cadastrado no grupo*\n\n");
                             break;
                         }
-
-                        //seleciono o contato requisitado
-
-                        auxContato = listaContatos;
-                        while(auxContato!=NULL){
-                            orden_contato--;
-                            if(orden_contato==0){
-                                printf("SELECIONADO - Nome: %s\tTelefone: %s\n",auxContato->nome,auxContato->telefone);
-                                strcpy(contatoPraAdd.nome,auxContato->nome);
-                                strcpy(contatoPraAdd.telefone,auxContato->telefone);
-
-                                if(adiciona_membro(contatoPraAdd, grupoPraAdd.nome) == 1)
-                                    printf("\n   *Contato ja cadastrado no grupo*\n\n");
-                                break;
-                                }
-                            auxContato = auxContato->prox;
-                        }
+                        auxContato = auxContato->prox;
+                    }
                     break;
 
-                    case 0:
-                        break;
-                    default:
-                        printf("Nao entendi o que voce quer!\n");
-                        break;
-                    }        
+                case 0:
+                    break;
+                default:
+                    printf("Nao entendi o que voce quer!\n");
+                    break;
+                }
 
-            }while(operacao!=0);
-        break;
+            } while (operacao != 0);
+            break;
 
         case 6: //Listar Grupos
-            listar_grupos();        
+            listar_grupos();
             break;
 
         case 7: //Listar mensagens
@@ -475,10 +477,11 @@ int main(int argc, char *argv[])
             printf("Nao entendi o que voce quer!\n");
             break;
         }
-        
+
     } while (operacao_principal != 0);
 
-    escrever_arq(telefone);
+    escrever_arq_contato(telefone);
+    escrever_arq_grupo(telefone);
 
     if (send(socket_envia_servidor, ENCERRAR, sizeof(ENCERRAR), 0) < 0)
     {
@@ -749,44 +752,51 @@ int adiciona_contato(contato add)
 int adiciona_membro(contato add, char *nome)
 {
     contato *novo = (contato *)malloc(sizeof(contato));
-    if(novo == NULL){
+    if (novo == NULL)
+    {
         perror("ERRO - malloc(novo)");
         exit(errno);
     }
-    strcpy(novo->telefone,add.telefone);
-    strcpy(novo->nome,add.nome);
-    novo->prox=NULL;
+    strcpy(novo->telefone, add.telefone);
+    strcpy(novo->nome, add.nome);
+    novo->prox = NULL;
 
     grupo *aux = listaGrupos;
 
-    while(aux != NULL){
+    while (aux != NULL)
+    {
 
-        if(strcmp(aux->nome,nome) == 0){
-            if(searchContato(aux->membros, add.telefone)==1){
+        if (strcmp(aux->nome, nome) == 0)
+        {
+            if (searchContato(aux->membros, add.telefone) == 1)
+            {
                 return 1;
             }
-                
 
-            if(aux->membros==NULL){
+            if (aux->membros == NULL)
+            {
                 aux->membros = novo;
-                aux->membros->ant = NULL;               
-            }else{
-                    contato *mem = aux->membros;
-                while(mem->prox != NULL){
+                aux->membros->ant = NULL;
+            }
+            else
+            {
+                contato *mem = aux->membros;
+                while (mem->prox != NULL)
+                {
                     mem = mem->prox;
                     __fpurge(stdout);
                 }
                 mem->prox = novo;
-                mem->prox->ant=mem; 
- 
+                mem->prox->ant = mem;
             }
-            aux->qtd+=1;
+            aux->qtd += 1;
             return 0;
-        }else{
+        }
+        else
+        {
             aux = aux->prox;
         }
     }
-
 }
 
 void cria_grupo(grupo add)
@@ -1070,16 +1080,19 @@ void print_msgs(){
 void print_grupo(char *nome){
     grupo *aux = listaGrupos;
 
-    while(aux != NULL){
-        if(strcmp(aux->nome,nome) == 0){
-            printf("--------Nome do grupo: %s---------\n",aux->nome);
+    while (aux != NULL)
+    {
+        if (strcmp(aux->nome, nome) == 0)
+        {
+            printf("--------Nome do grupo: %s---------\n", aux->nome);
             printf("\tQuantidade de membros %i\n\n", aux->qtd);
             __fpurge(stdout);
 
             contato *aux2 = aux->membros;
-            while(aux2 != NULL){
-                printf("Nome %s Telefone: %s\n",aux2->nome, aux2->telefone);
-                __fpurge(stdout);  
+            while (aux2 != NULL)
+            {
+                printf("Nome %s Telefone: %s\n", aux2->nome, aux2->telefone);
+                __fpurge(stdout);
                 aux2 = aux2->prox;
             }
             printf("\n");
@@ -1133,50 +1146,49 @@ void get_localizacao(contato *contatoPraEnviar, int socket_envia_servidor){
             char buffer_recebimento[TAM_BUFFER];
             char *msg[TAM_BUFFER];
 
-            strcpy(buffer_envio, GETLOC);
-            strcat(buffer_envio, ";");
-            strcat(buffer_envio, contatoPraEnviar->telefone);
-    #ifdef DEBUG
-            printf("Comando enviado= %s\n\n", buffer_envio);
-    #endif
-
-            if (send(socket_envia_servidor, buffer_envio, sizeof(buffer_envio), 0) < 0)
-            {
-                perror("ERRO - send2server");
-                exit(errno);
-            }
-
-            if (recv(socket_envia_servidor, buffer_recebimento, sizeof(buffer_recebimento), 0) < 0)
-            {
-                perror("ERRO - recvFromServer");
-                exit(errno);
-            }
-            //tokenizo a resposta da requisicao, msg[0] tera ip/hostname, msg[1] tera porta
-            //se telefone nao encontrado msg[0] = NOTFOUND
-            msg[0] = strtok(buffer_recebimento, ";\n");
-            msg[1] = strtok(NULL, ";\n");
-
+    strcpy(buffer_envio, GETLOC);
+    strcat(buffer_envio, ";");
+    strcat(buffer_envio, contatoPraEnviar->telefone);
 #ifdef DEBUG
-            printf("Comando recebido= %s - %s\n\n", msg[0], msg[1]);
+    printf("Comando enviado= %s\n\n", buffer_envio);
 #endif
 
-            if (msg[0] == NULL || msg[1] == NULL)
-            {
-                printf("ERRO - getloc received NULL\n");
-                //break;
-                return;
-            }
-            if (strcmp(msg[0], NOTFOUND) == 0)
-            {
-                printf("Telefone offline ou inexistente!\n");
-                //break;
-                return;
-            }
+    if (send(socket_envia_servidor, buffer_envio, sizeof(buffer_envio), 0) < 0)
+    {
+        perror("ERRO - send2server");
+        exit(errno);
+    }
 
-            contatoPraEnviar->localizacao.sin_addr.s_addr = inet_addr(msg[0]);
-            contatoPraEnviar->localizacao.sin_port = htons(atoi(msg[1]));
-            contatoPraEnviar->localizacao.sin_family = AF_INET;
+    if (recv(socket_envia_servidor, buffer_recebimento, sizeof(buffer_recebimento), 0) < 0)
+    {
+        perror("ERRO - recvFromServer");
+        exit(errno);
+    }
+    //tokenizo a resposta da requisicao, msg[0] tera ip/hostname, msg[1] tera porta
+    //se telefone nao encontrado msg[0] = NOTFOUND
+    msg[0] = strtok(buffer_recebimento, ";\n");
+    msg[1] = strtok(NULL, ";\n");
 
+#ifdef DEBUG
+    printf("Comando recebido= %s - %s\n\n", msg[0], msg[1]);
+#endif
+
+    if (msg[0] == NULL || msg[1] == NULL)
+    {
+        printf("ERRO - getloc received NULL\n");
+        //break;
+        return;
+    }
+    if (strcmp(msg[0], NOTFOUND) == 0)
+    {
+        printf("Telefone offline ou inexistente!\n");
+        //break;
+        return;
+    }
+
+    contatoPraEnviar->localizacao.sin_addr.s_addr = inet_addr(msg[0]);
+    contatoPraEnviar->localizacao.sin_port = htons(atoi(msg[1]));
+    contatoPraEnviar->localizacao.sin_family = AF_INET;
 }
 
 void enviar_texto(int socket_envia_cliente, char *buffer_envio){
@@ -1202,13 +1214,13 @@ void enviar_texto(int socket_envia_cliente, char *buffer_envio){
                 }
                 //depois a mensagem em si
 
-                if ((ret = send(socket_envia_cliente, buffer_envio, strlen(buffer_envio), 0)) < 0)
-                {
-                    perror("ERRO - send2client");
-                    //break;
-                    return;
-                }
-                printf("Mensagem enviada! %i bytes\n", ret);
+    if ((ret = send(socket_envia_cliente, buffer_envio, strlen(buffer_envio), 0)) < 0)
+    {
+        perror("ERRO - send2client");
+        //break;
+        return;
+    }
+    printf("Mensagem enviada! %i bytes\n", ret);
 }
 
 void enviar_foto(int socket_envia_cliente){
@@ -1218,7 +1230,6 @@ void enviar_foto(int socket_envia_cliente){
     char *fileBuf;
     ssize_t size;
     FILE *fp;
-
 
     printf("Enviar Foto\n\n");
     printf("Digite o nome do arquivo\n>");
@@ -1290,29 +1301,32 @@ int conecta_cliente(contato *contatoPraEnviar, char *telefone){//Conecta com cli
     {
         perror("ERRO - send2client");
         //break;
-    }    
+    }
     return socket_envia_cliente;
 }
 
-int listar_contatos(){//Retorna a quantidade de contatos
+int listar_contatos()
+{ //Retorna a quantidade de contatos
     contato *auxContato;
-    int i=0;
-    //Printo todos os contatos    
+    int i = 0;
+    //Printo todos os contatos
     auxContato = listaContatos;
-    while(auxContato!=NULL){
+    while (auxContato != NULL)
+    {
         i++;
-        printf("#%i - Nome: %s\tTelefone: %s\n",i,auxContato->nome,auxContato->telefone);
+        printf("#%i - Nome: %s\tTelefone: %s\n", i, auxContato->nome, auxContato->telefone);
         auxContato = auxContato->prox;
     }
     return i;
 }
 
-void listar_grupos(){
+void listar_grupos()
+{
     grupo *aux = listaGrupos;
     while(aux != NULL){
         print_grupo(aux->nome);
         aux = aux->prox;
-    }    
+    }
 }
 
 void selecionar_grupo(grupo *grupoPraEnviar){
