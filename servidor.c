@@ -14,7 +14,7 @@
 #include <pthread.h> 
 
 #define DEBUG 1
-
+#define TAM_BUFFER 250
 //comandos
 #define ENCERRAR "encerrar" // encerra conexao, o que torna offline
 #define GETLOC "getloc" // requere informacao do servidor, necessario informar telefone
@@ -152,10 +152,10 @@ int main(int argc, char *argv[])
 
 void *thread_cliente(void *arg)
 {
-    char buffer_envia[80];              
-    char buffer_recebe[80];
-    char *msg[80];
-    char aux[80];
+    char buffer_envia[TAM_BUFFER];              
+    char buffer_recebe[TAM_BUFFER];
+    char *msg[TAM_BUFFER];
+    char aux[TAM_BUFFER];
     usuario cliente;
 
     ptr_thread_arg thread_arg = (ptr_thread_arg)arg;
@@ -201,7 +201,7 @@ void *thread_cliente(void *arg)
         printf("Comando recebido= %s - %s - %s\n\n",msg[0],msg[1],msg[2]);
         #endif
 
-        if(msg[0] == NULL) break;
+        if(msg[0] == NULL || msg[1] == NULL) break;
         if(strcmp(msg[0],GETLOC) == 0){
             //Requisicao de informações de localizacao
             printf("Requisicao GETLOC de cliente id: %s\n",cliente.telefone);
