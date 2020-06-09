@@ -25,15 +25,18 @@
 #define MSGPHOTO "msgphoto"
 #define MSGTEXT "msgtext"
 
+/*Flag de DEBUG, comente essa linha para desativar as mensagens de depuração*/
 #define DEBUG 1
 
+/*Tamanho dos buffers utilizados pelo programa*/
 #define TAM_BUFFER 250
 
+/*Contantes para funcao*/
 #define CONTATO 1
 #define GRUPO 10
 
-typedef struct noC
-{
+/*Struct de contatos*/
+typedef struct noC{
     char telefone[20];
     char nome[50];
     struct sockaddr_in localizacao;
@@ -41,8 +44,8 @@ typedef struct noC
     struct noC *ant;
 } contato;
 
-typedef struct noG
-{
+/*Struct de grupos*/
+typedef struct noG{
     contato *membros;
     int qtd;
     char nome[50];
@@ -50,7 +53,7 @@ typedef struct noG
     struct noG *ant;
 } grupo;
 
-
+/*Struct de mensagens*/
 typedef struct noM{
     char msg[TAM_BUFFER];
     contato remetente;
@@ -58,23 +61,25 @@ typedef struct noM{
     struct noM *prox;
 }mensagem;
 
-//Thread mensagens setup
-typedef struct
-{
+//Struct de argumentos da thread
+typedef struct{
     int socket_server;
     int socket_recebe_cliente;
     struct sockaddr_in server;
 } thread_arg, *ptr_thread_arg;
 
+/*Mutex*/
 pthread_mutex_t mutex;
 
 //lista de contatos e grupos
 grupo *listaGrupos = NULL;
 contato *listaContatos = NULL;
 mensagem *listaMensagens = NULL;
+/*Contador de mensagens nao lidas*/
 int naoLida=0;
-void *thread_msg(void *);
 
+/*Funcao da thread de recepcao de mensagens*/
+void *thread_msg(void *);
 /*Remove usuario da lista, retorna 1 se sucesso*/
 int remove_contato(char *tel);
 /*Adiciona o usuario no fim da lista, caso usuario ja exista nada eh feito*/
@@ -101,18 +106,31 @@ int escrever_arq_grupo(char telefone[]);
 int ler_arq_grupo(char telefone[], int countGrupos);
 /*imprime informacoes do grupo*/
 void print_grupo(char *nome);
-
+/*Adiciona mensagens a lista de mensagens*/
 int adiciona_msg(mensagem msg);
+/*Printa todas as mensagens na lista*/
 void print_msgs();
+/*Coloca por referencia o contato selecionado*/
 void selecionar_contato(contato *contatoPraEnviar, int countContatos);
+/*Coloca por referencia a localizacao do contato selecionado*/
 void get_localizacao(contato *contatoPraEnviar, int socket_envia_servidor);
+/*Envia a foto ao cliente*/
 void enviar_foto(int socket_envia_cliente,char *nome_arquivo);
+/*Envia o texto ao cliente*/
 void enviar_texto(int socket_envia_cliente, char *buffer_envio);
+/*Retorna o socket para conexao ao cliente*/
 int conecta_cliente(contato *contatoPraEnviar, char *telefone);
+/*Exibe na tela todos os contatos*/
 int listar_contatos();
-int contar_grupos(); //somente conta a quantidade
-void listar_grupos(); //somente mostra os grupos
+/*Exibe na tela todos os grupos*/
+void listar_grupos();
+/*Retorna a quantidade de grupos*/
+int contar_grupos();
+/*Retorna a quantidade de contatos*/
+int contar_contatos();
+ /*Coloca por referencia o grupo selecionado*/
 void selecionar_grupo(grupo *grupoPraEnviar);
+/*Verifica se tem alguem na lista*/
 int tem_alguem(int tipo);
 
 
@@ -126,9 +144,6 @@ int main(int argc, char *argv[])
     char telefone[20];
     char path[100];
     char *msg[TAM_BUFFER];
-    //char *fileBuf;
-    //ssize_t size;
-    //FILE *fp;
 
     struct hostent *hostnm;
     int inetaddr;
@@ -158,11 +173,6 @@ int main(int argc, char *argv[])
     int ip_recebimento, porta_recebimento;
     int bindReturn;
 
-    //Setup do socket de envio de mensagens ao cliente
-    /*if((socket_envia_cliente = socket(PF_INET,SOCK_STREAM,0)) < 0){
-        perror("ERRO - Socket(recv)");
-        exit(errno);
-    }*/
     //Setup do socket de recebimento de mensagens
     if ((socket_recebe_cliente = socket(PF_INET, SOCK_STREAM, 0)) < 0)
     {
@@ -292,6 +302,7 @@ int main(int argc, char *argv[])
         case 1: //Enviar Msg
 
             //Ordem de envio:
+            // Telefone do remetente
             //Tipo da mensagem - MSGTEXT ou MSGPHOTO
             //Tamanho da mensagem
             //A mensagem em si
@@ -564,7 +575,6 @@ int main(int argc, char *argv[])
     pthread_cancel(ptid);
 
     close(socket_envia_servidor);
-    //close(socket_envia_cliente);
     close(socket_recebe_cliente);
     pthread_mutex_destroy(&mutex);
     free(listaContatos);
@@ -1196,7 +1206,6 @@ void selecionar_contato(contato *contatoPraEnviar, int countContatos){
             if (operacao > i || operacao > countContatos || operacao <= 0)
             {
                 printf("Selecao invalida\n");
-                //break;
                 return;
             }
             //seleciono o contato requisitado
@@ -1209,7 +1218,6 @@ void selecionar_contato(contato *contatoPraEnviar, int countContatos){
                     printf("SELECIONADO - Nome: %s\tTelefone: %s\n", auxContato->nome, auxContato->telefone);
                     strcpy(contatoPraEnviar->nome, auxContato->nome);
                     strcpy(contatoPraEnviar->telefone, auxContato->telefone);
-                    //break;
                     return;
                 }
                 auxContato = auxContato->prox;
@@ -1275,7 +1283,6 @@ void enviar_texto(int socket_envia_cliente, char *buffer_envio){
                 if (send(socket_envia_cliente, MSGTEXT, sizeof(aux), 0) < 0)
                 {
                     perror("ERRO - send2client");
-                    //break;
                     return;
                 }
                 
@@ -1284,7 +1291,6 @@ void enviar_texto(int socket_envia_cliente, char *buffer_envio){
                 if (send(socket_envia_cliente, aux, sizeof(aux), 0) < 0)
                 {
                     perror("ERRO - send2client");
-                    //break;
                     return;
                 }
                 //depois a mensagem em si
@@ -1292,7 +1298,6 @@ void enviar_texto(int socket_envia_cliente, char *buffer_envio){
     if ((ret = send(socket_envia_cliente, buffer_envio, strlen(buffer_envio), 0)) < 0)
     {
         perror("ERRO - send2client");
-        //break;
         return;
     }
     printf("Mensagem enviada! %i bytes\n", ret);
@@ -1309,7 +1314,6 @@ void enviar_foto(int socket_envia_cliente, char *nome_arquivo){
     if (send(socket_envia_cliente, MSGPHOTO, sizeof(buffer_envio), 0) < 0)
     {
         perror("ERRO - send2client");
-        //break;
         return;
     }
     //gero o caminho do arquivo solicitado
@@ -1331,14 +1335,12 @@ void enviar_foto(int socket_envia_cliente, char *nome_arquivo){
         if (send(socket_envia_cliente, buffer_envio, sizeof(buffer_envio), 0) < 0)
         {
             perror("ERRO - send2client");
-            //break;
             return;
         }
         //depois o arquivo em si
         if ((send(socket_envia_cliente, fileBuf, size, 0)) < 0)
         {
             perror("ERRO - send2client");
-            //break;
             return;
         }
         free(fileBuf);
@@ -1348,12 +1350,11 @@ void enviar_foto(int socket_envia_cliente, char *nome_arquivo){
     {
         //Falha na leitura
         perror("ERRO - read");
-        //break;
         return;
     }
 }
 
-int conecta_cliente(contato *contatoPraEnviar, char *telefone){//Conecta com cliente e envia informacoes do transmissor 
+int conecta_cliente(contato *contatoPraEnviar, char *telefone){
     int socket_envia_cliente;
     
     
@@ -1365,21 +1366,17 @@ int conecta_cliente(contato *contatoPraEnviar, char *telefone){//Conecta com cli
     if (connect(socket_envia_cliente, (struct sockaddr *)&contatoPraEnviar->localizacao, sizeof(contatoPraEnviar->localizacao)))
     {
         perror("ERRO - connect2client");
-        //break;
     }
     if (send(socket_envia_cliente, telefone, sizeof(telefone), 0) < 0)
     {
         perror("ERRO - send2client");
-        //break;
     }
     return socket_envia_cliente;
 }
 
-int listar_contatos()
-{ //Retorna a quantidade de contatos
+int listar_contatos(){ 
     contato *auxContato;
     int i = 0;
-    //Printo todos os contatos
     auxContato = listaContatos;
     while (auxContato != NULL)
     {
@@ -1390,8 +1387,7 @@ int listar_contatos()
     return i;
 }
 
-void listar_grupos()
-{
+void listar_grupos(){
     grupo *aux = listaGrupos;
     while(aux != NULL){
         print_grupo(aux->nome);
@@ -1406,6 +1402,18 @@ int contar_grupos()
     while(aux != NULL){
         i++;
     }
+}
+
+int contar_contatos(){
+    contato *auxContato;
+    int i = 0;
+    auxContato = listaContatos;
+    while (auxContato != NULL){
+        i++;
+        auxContato = auxContato->prox;
+    }
+    return i;
+
 }
 
 void selecionar_grupo(grupo *grupoPraEnviar){
@@ -1447,20 +1455,14 @@ void selecionar_grupo(grupo *grupoPraEnviar){
 }
 
 int tem_alguem(int tipo){
-    if (tipo == 1){
-        if (listar_contatos() == 0){
+    if (tipo == CONTATO){
+        if (contar_contatos() == 0)
             return 0;
-        }
-        else{
-            return 1;
-        }
+        return 1;
     }
-    else if (tipo == 10){
-        if (contar_grupos() == 0){
+    else if (tipo == GRUPO){
+        if (contar_grupos() == 0)
             return 0;
-        }
-        else{
-            return 1;
-        }
+        return 1;
     }
 }
