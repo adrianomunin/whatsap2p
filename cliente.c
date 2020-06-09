@@ -333,6 +333,7 @@ int main(int argc, char *argv[])
                     while(auxContato != NULL){
                         get_localizacao(auxContato, socket_envia_servidor);
                         socket_envia_cliente = conecta_cliente(auxContato, telefone);
+                        usleep(100);
                         enviar_texto(socket_envia_cliente, buffer_envio);
                         close(socket_envia_cliente);
                         auxContato = auxContato->prox;
